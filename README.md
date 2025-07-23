@@ -139,19 +139,29 @@ cd frontend
 docker build -f Dockerfile.prod -t ita-rent-frontend .
 ```
 
-## 🚀 Деплой
+## 🚀 Деплой на Railway
 
-### Backend (Railway)
+### Быстрый деплой (5 минут)
 
-1. Подключите репозиторий к Railway
-2. Railway автоматически использует `railway.toml` конфигурацию
-3. Установите переменные окружения в Railway dashboard
+1. **Создайте GitHub репозиторий и загрузите код:**
 
-### Frontend (Vercel)
+```bash
+git remote add origin https://github.com/YOUR_USERNAME/ITA_RENT_BOT.git
+git push -u origin main
+```
 
-1. Подключите папку `frontend/` к Vercel
-2. Vercel автоматически использует `vercel.json` конфигурацию
-3. Установите переменную `VITE_API_URL` в Vercel dashboard
+2. **Зайдите на [railway.app](https://railway.app) и создайте проект из GitHub репозитория**
+
+3. **Railway автоматически создаст 2 сервиса:**
+
+   - `backend` (FastAPI + PostgreSQL)
+   - `frontend` (React)
+
+4. **Настройте переменные окружения:**
+   - Backend: `ENVIRONMENT=production`, `SECRET_KEY=your-key`
+   - Frontend: `VITE_API_URL=https://your-backend.railway.app`
+
+**📖 Подробные инструкции:** `DEPLOY_NOW.md` и `RAILWAY_DEPLOYMENT.md`
 
 ## 🔄 Следующие этапы
 
