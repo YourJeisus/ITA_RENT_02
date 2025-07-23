@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from 'axios';
 
 // Автоматическое определение базового URL API
 const getApiBaseUrl = (): string => {
@@ -8,35 +8,35 @@ const getApiBaseUrl = (): string => {
   }
 
   // 2. Для локальной разработки
-  if (import.meta.env.DEV || window.location.hostname === "localhost") {
-    return "http://localhost:8000";
+  if (import.meta.env.DEV || window.location.hostname === 'localhost') {
+    return 'http://localhost:8000';
   }
 
   // 3. Для Railway - используем относительные пути (same origin)
-  if (window.location.hostname.includes("railway.app")) {
-    return ""; // Пустая строка = относительные пути к тому же домену
+  if (window.location.hostname.includes('railway.app')) {
+    return ''; // Пустая строка = относительные пути к тому же домену
   }
 
   // 4. Fallback для других окружений
-  return "https://itarentbot-production.up.railway.app";
+  return 'https://itarentbot-production.up.railway.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
-console.log("🔗 API Base URL:", API_BASE_URL);
-console.log("🌍 Current environment:", {
+console.log('🔗 API Base URL:', API_BASE_URL);
+console.log('🌍 Current environment:', {
   isDev: import.meta.env.DEV,
   hostname: window.location.hostname,
   viteApiUrl: import.meta.env.VITE_API_URL,
-  isRailway: window.location.hostname.includes("railway.app"),
+  isRailway: window.location.hostname.includes('railway.app'),
 });
 
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`, // Добавляем префикс API
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
-  timeout: 30000, // Увеличиваем таймаут до 30 секунд для парсинга
+  timeout: 15000, // Увеличиваем таймаут до 15 секунд
 });
 
 // Перехватчик для добавления токена авторизации
@@ -44,14 +44,14 @@ apiClient.interceptors.request.use(
   (config) => {
     // Предполагается, что токен хранится в localStorage
     // В реальном приложении используйте более безопасное хранилище или Zustand/Context для токена
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => {
-    console.error("Request interceptor error:", error);
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -62,11 +62,11 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error("API Error:", error);
+    console.error('API Error:', error);
 
     // Если API недоступен, показываем предупреждение но не ломаем приложение
-    if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK") {
-      console.warn("API недоступен, используем моковые данные");
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+      console.warn('API недоступен, используем моковые данные');
     }
 
     return Promise.reject(error);
@@ -76,16 +76,16 @@ apiClient.interceptors.response.use(
 export default apiClient;
 
 // --- Моковые функции для разработки UI пока нет бэкенда для них ---
-import { City, FilterState, Listing, ApiResponse } from "@/types"; // Убедитесь, что путь правильный
+import { City, FilterState, Listing, ApiResponse } from '@/types'; // Убедитесь, что путь правильный
 
 const mockCitiesData: City[] = [
-  { id: "rome", name: "Рим" },
-  { id: "milan", name: "Милан" },
+  { id: 'rome', name: 'Рим' },
+  { id: 'milan', name: 'Милан' },
   // ... другие города Италии
 ];
 
 export const fetchCities = async (): Promise<City[]> => {
-  console.log("apiClient: fetchCities (mocked)");
+  console.log('apiClient: fetchCities (mocked)');
   return new Promise((resolve) =>
     setTimeout(() => resolve(mockCitiesData), 300)
   );
@@ -98,16 +98,16 @@ export const fetchLocationSuggestions = async (
     `apiClient: fetchLocationSuggestions (mocked) for query: ${query}`
   );
   const mockLocations = [
-    "Trastevere",
-    "Monti",
-    "Prati",
-    "Testaccio",
-    "Termini",
-    "Vaticano",
-    "Fontana di Trevi",
-    "Colosseo",
-    "San Giovanni",
-    "EUR",
+    'Trastevere',
+    'Monti',
+    'Prati',
+    'Testaccio',
+    'Termini',
+    'Vaticano',
+    'Fontana di Trevi',
+    'Colosseo',
+    'San Giovanni',
+    'EUR',
   ];
   return new Promise((resolve) => {
     setTimeout(() => {

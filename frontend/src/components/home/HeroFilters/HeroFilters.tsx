@@ -1,22 +1,22 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useFilterStore } from "@/store/filterStore";
-import { City, PropertyType, TransactionType } from "@/types";
-import SubscriptionModal from "@/components/common/SubscriptionModal";
-import styles from "./HeroFilters.module.scss";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useFilterStore } from '@/store/filterStore';
+import { City, PropertyType, TransactionType } from '@/types';
+import SubscriptionModal from '@/components/common/SubscriptionModal';
+import styles from './HeroFilters.module.scss';
 
 // Города Италии
 const italianCities: City[] = [
-  { id: "roma", name: "Рим" },
-  { id: "milano", name: "Милан" },
-  { id: "napoli", name: "Неаполь" },
-  { id: "torino", name: "Турин" },
-  { id: "firenze", name: "Флоренция" },
-  { id: "bologna", name: "Болонья" },
-  { id: "venezia", name: "Венеция" },
-  { id: "genova", name: "Генуя" },
-  { id: "palermo", name: "Палермо" },
-  { id: "verona", name: "Верона" },
+  { id: 'roma', name: 'Рим' },
+  { id: 'milano', name: 'Милан' },
+  { id: 'napoli', name: 'Неаполь' },
+  { id: 'torino', name: 'Турин' },
+  { id: 'firenze', name: 'Флоренция' },
+  { id: 'bologna', name: 'Болонья' },
+  { id: 'venezia', name: 'Венеция' },
+  { id: 'genova', name: 'Генуя' },
+  { id: 'palermo', name: 'Палермо' },
+  { id: 'verona', name: 'Верона' },
 ];
 
 const HeroFilters: React.FC = () => {
@@ -30,46 +30,48 @@ const HeroFilters: React.FC = () => {
     const queryParams = new URLSearchParams();
 
     // Город (обязательный параметр)
-    if (filters.city?.name) {
-      queryParams.append("city", filters.city.name);
+    if (filters.city?.id) {
+      queryParams.append('city', filters.city.id);
     } else {
-      queryParams.append("city", "Roma"); // По умолчанию
+      queryParams.append('city', 'roma'); // По умолчанию
     }
 
     // Тип недвижимости
-    if (filters.propertyType && filters.propertyType !== "all") {
-      queryParams.append("property_type", filters.propertyType);
+    if (filters.propertyType && filters.propertyType !== 'all') {
+      queryParams.append('property_type', filters.propertyType);
+    } else {
+      // Не добавляем property_type по умолчанию - пусть будет "все типы"
     }
 
-    // Цена
-    if (filters.priceMin) {
-      queryParams.append("min_price", filters.priceMin.toString());
-    }
-    if (filters.priceMax) {
-      queryParams.append("max_price", filters.priceMax.toString());
-    }
+    // Язык интерфейса
+    queryParams.append('language', 'en');
 
     // Комнаты
-    if (filters.rooms && filters.rooms.length > 0) {
-      const minRooms = Math.min(...filters.rooms);
-      const maxRooms = Math.max(...filters.rooms);
-      queryParams.append("min_rooms", String(minRooms));
-      if (minRooms !== maxRooms) {
-        queryParams.append("max_rooms", String(maxRooms));
+    if (filters.rooms !== null) {
+      if (filters.rooms === 0) {
+        // Студия
+        queryParams.append('min_rooms', '1');
+        queryParams.append('max_rooms', '1');
+      } else if (filters.rooms === 5) {
+        // 5+ комнат
+        queryParams.append('min_rooms', '5');
+      } else {
+        queryParams.append('min_rooms', String(filters.rooms));
+        queryParams.append('max_rooms', String(filters.rooms));
       }
     }
 
-    // Площадь
-    if (filters.areaMin) {
-      queryParams.append("min_area", String(filters.areaMin));
+    // Цена
+    if (filters.priceMin !== null) {
+      queryParams.append('min_price', String(filters.priceMin));
     }
-    if (filters.areaMax) {
-      queryParams.append("max_area", String(filters.areaMax));
+    if (filters.priceMax !== null) {
+      queryParams.append('max_price', String(filters.priceMax));
     }
 
     // Район/местоположение (пока не используется в API, но сохраняем для будущего)
     if (filters.locationQuery) {
-      queryParams.append("locationQuery", filters.locationQuery);
+      queryParams.append('locationQuery', filters.locationQuery);
     }
 
     // Навигация на страницу результатов с параметрами
@@ -85,16 +87,10 @@ const HeroFilters: React.FC = () => {
       city: filters.city?.name || undefined,
       min_price: filters.priceMin || undefined,
       max_price: filters.priceMax || undefined,
-      min_rooms:
-        filters.rooms && filters.rooms.length > 0
-          ? Math.min(...filters.rooms)
-          : undefined,
-      max_rooms:
-        filters.rooms && filters.rooms.length > 0
-          ? Math.max(...filters.rooms)
-          : undefined,
+      min_rooms: filters.rooms === 0 ? 1 : filters.rooms || undefined,
+      max_rooms: filters.rooms === 5 ? undefined : filters.rooms || undefined,
       property_type:
-        filters.propertyType === "all" ? undefined : filters.propertyType,
+        filters.propertyType === 'all' ? undefined : filters.propertyType,
     };
   };
 
@@ -107,7 +103,7 @@ const HeroFilters: React.FC = () => {
       <form onSubmit={handleSearch} className={styles.form}>
         <div className={styles.formGroup}>
           <select
-            value={filters.city?.id || ""}
+            value={filters.city?.id || ''}
             onChange={(e) => {
               const selectedCity =
                 italianCities.find((c) => c.id === e.target.value) || null;
@@ -158,14 +154,10 @@ const HeroFilters: React.FC = () => {
 
         <div className={styles.formGroup}>
           <select
-            value={
-              filters.rooms && filters.rooms.length === 1
-                ? String(filters.rooms[0])
-                : ""
-            }
+            value={filters.rooms === null ? '' : String(filters.rooms)}
             onChange={(e) =>
               filters.setRooms(
-                e.target.value === "" ? null : [Number(e.target.value)]
+                e.target.value === '' ? null : Number(e.target.value)
               )
             }
             className={styles.select}
@@ -184,10 +176,10 @@ const HeroFilters: React.FC = () => {
           <input
             type="number"
             placeholder="Цена от €"
-            value={filters.priceMin === null ? "" : filters.priceMin}
+            value={filters.priceMin === null ? '' : filters.priceMin}
             onChange={(e) =>
               filters.setPriceMin(
-                e.target.value === "" ? null : Number(e.target.value)
+                e.target.value === '' ? null : Number(e.target.value)
               )
             }
             min="0"
@@ -197,10 +189,10 @@ const HeroFilters: React.FC = () => {
           <input
             type="number"
             placeholder="до €"
-            value={filters.priceMax === null ? "" : filters.priceMax}
+            value={filters.priceMax === null ? '' : filters.priceMax}
             onChange={(e) =>
               filters.setPriceMax(
-                e.target.value === "" ? null : Number(e.target.value)
+                e.target.value === '' ? null : Number(e.target.value)
               )
             }
             min={filters.priceMin === null ? 0 : filters.priceMin}

@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { CircularProgress, Alert, Pagination, Box } from "@mui/material";
-import ListingCard from "../components/search/ListingCard/ListingCard";
-import { useListingStore } from "@/store/listingStore";
-import { FilterState } from "@/types";
-import SearchStatus from "@/components/common/SearchStatus";
-import FiltersSidebar from "@/components/search/FiltersSidebar/FiltersSidebar";
-import styles from "./SearchResultsPage.module.scss";
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { CircularProgress, Alert, Pagination, Box } from '@mui/material';
+import ListingCard from '../components/search/ListingCard/ListingCard';
+import { useListingStore } from '@/store/listingStore';
+import { FilterState } from '@/types';
+import SearchStatus from '@/components/common/SearchStatus';
+import FiltersSidebar from '@/components/search/FiltersSidebar/FiltersSidebar';
+import styles from './SearchResultsPage.module.scss';
 
 const SearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -19,7 +19,7 @@ const SearchResultsPage: React.FC = () => {
     error,
     searchType,
     searchMessage,
-    fetchListings,
+    smartSearch,
     listingsPerPage,
   } = useListingStore();
 
@@ -30,7 +30,7 @@ const SearchResultsPage: React.FC = () => {
     const filtersFromUrl: any = {};
     searchParams.forEach((value, key) => {
       // Для комнат, которые могут быть массивом
-      if (key === "rooms") {
+      if (key === 'rooms') {
         if (!filtersFromUrl.rooms) filtersFromUrl.rooms = [];
         filtersFromUrl.rooms.push(value);
       } else {
@@ -41,11 +41,11 @@ const SearchResultsPage: React.FC = () => {
     // Преобразуем параметры в формат, который ожидает smartSearch (FilterState)
     const filtersForStore: FilterState = {
       city: {
-        id: filtersFromUrl.city || "roma",
-        name: filtersFromUrl.city || "Рим",
+        id: filtersFromUrl.city || 'roma',
+        name: filtersFromUrl.city || 'Рим',
       },
-      transactionType: "rent",
-      propertyType: filtersFromUrl.property_type || "apartment",
+      transactionType: 'rent',
+      propertyType: filtersFromUrl.property_type || 'apartment',
       rooms: filtersFromUrl.rooms ? filtersFromUrl.rooms.map(Number) : null,
       priceMin: filtersFromUrl.price_min
         ? Number(filtersFromUrl.price_min)
@@ -55,11 +55,11 @@ const SearchResultsPage: React.FC = () => {
         : null,
       areaMin: filtersFromUrl.min_area ? Number(filtersFromUrl.min_area) : null,
       areaMax: filtersFromUrl.max_area ? Number(filtersFromUrl.max_area) : null,
-      locationQuery: "", // Не используется пока
+      locationQuery: '', // Не используется пока
     };
 
-    fetchListings(filtersForStore, page);
-  }, [searchParams, page, fetchListings]);
+    smartSearch(filtersForStore, page);
+  }, [searchParams, page, smartSearch]);
 
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
@@ -71,14 +71,14 @@ const SearchResultsPage: React.FC = () => {
 
   const getSourceColor = (source: string) => {
     switch (source) {
-      case "idealista":
-        return "#E91E63";
-      case "immobiliare":
-        return "#2196F3";
-      case "subito":
-        return "#4CAF50";
+      case 'idealista':
+        return '#E91E63';
+      case 'immobiliare':
+        return '#2196F3';
+      case 'subito':
+        return '#4CAF50';
       default:
-        return "#757575";
+        return '#757575';
     }
   };
 
@@ -124,8 +124,8 @@ const SearchResultsPage: React.FC = () => {
                 listing_id: listing.id,
                 title: listing.title,
                 price: listing.price || 0,
-                price_currency: "EUR",
-                location_address: listing.city || listing.address_text || "",
+                price_currency: 'EUR',
+                location_address: listing.city || listing.address_text || '',
                 url_details: listing.url,
                 image_urls: listing.photos_urls || [],
                 area_sqm: listing.area_sqm,
@@ -139,7 +139,7 @@ const SearchResultsPage: React.FC = () => {
         </div>
 
         {totalPages > 1 && (
-          <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
+          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
             <Pagination
               count={totalPages}
               page={page}

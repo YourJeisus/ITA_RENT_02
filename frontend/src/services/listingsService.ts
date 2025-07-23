@@ -187,6 +187,28 @@ class ListingsService {
       throw error;
     }
   }
+
+  // Запуск парсинга через существующий API
+  async runScraping(params: any): Promise<any> {
+    try {
+      const response = await apiClient.post("/scraping/run", params);
+      return response.data;
+    } catch (error) {
+      console.error("Error running scraping:", error);
+      throw error;
+    }
+  }
+
+  // Получение статуса парсинга
+  async getScrapingStatus(): Promise<any> {
+    try {
+      const response = await apiClient.get("/scraping/status");
+      return response.data;
+    } catch (error) {
+      console.error("Error getting scraping status:", error);
+      throw error;
+    }
+  }
 }
 
 export const listingsService = new ListingsService();
