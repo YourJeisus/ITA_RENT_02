@@ -357,3 +357,51 @@ async def test_database_connection(db: Session = Depends(get_db)):
             "error": str(e),
             "database_connection": "FAILED"
         } 
+
+
+@router.post("/test-create-listing")
+async def test_create_listing(db: Session = Depends(get_db)):
+    """
+    Тестирование создания простого объявления
+    """
+    try:
+        from src.schemas.listing import ListingCreate
+        from src.crud.crud_listing import listing as crud_listing
+        from datetime import datetime
+        
+        # Простое тестовое объявление
+        test_listing_data = {
+            "external_id": "TEST123",
+            "source": "immobiliare",
+            "url": "https://test.com/listing/123",
+            "title": "Test Apartment",
+            "description": "Test description",
+            "price": 1500.0,
+            "price_currency": "EUR",
+            "property_type": "apartment",
+            "rooms": 3,
+            "city": "Roma",
+            "images": ["https://example.com/image1.jpg"],
+            "is_active": True,
+            "scraped_at": datetime.utcnow()
+        }
+        
+        # Создаем через Pydantic схему
+        listing_create = ListingCreate(**test_listing_data)
+        
+        # Сохраняем в БД
+        new_listing = crud_listing.create(db=db, obj_in=listing_create)
+        
+        return {
+            "success": True,
+            "message": "Тестовое объявление создано",
+            "listing_id": new_listing.id,
+            "external_id": new_listing.external_id
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания тестового объявления: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        } 
