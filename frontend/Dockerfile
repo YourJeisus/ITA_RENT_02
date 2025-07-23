@@ -1,4 +1,4 @@
-# Простой Dockerfile для frontend (MVP)
+# Dockerfile для production
 FROM node:18-alpine
 
 # Рабочая директория
@@ -7,17 +7,24 @@ WORKDIR /app
 # Копирование package files
 COPY package*.json ./
 
-# Установка зависимостей
+# Установка всех зависимостей (включая dev для сборки)
 RUN npm ci
 
 # Копирование исходного кода
 COPY . .
 
-# Переменные окружения
-ENV NODE_ENV=development
+# Сборка проекта
+RUN npm run build
 
-# Порт по умолчанию
-EXPOSE 5173
+# Удаление dev зависимостей для уменьшения размера
+RUN npm prune --production
 
-# Команда запуска для разработки
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"] 
+# Переменные окружения для production
+ENV NODE_ENV=production
+ENV PORT=8080
+
+# Порт для Railway
+EXPOSE 8080
+
+# Команда запуска production сервера
+CMD ["npm", "start"] 
