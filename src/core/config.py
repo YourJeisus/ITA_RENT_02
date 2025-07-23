@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     
     # JWT
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 часа
+    EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48  # 48 часов
     
     class Config:
         env_file = ".env"
