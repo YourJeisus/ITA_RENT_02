@@ -1,6 +1,6 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Получаем __dirname для ES модулей
 const __filename = fileURLToPath(import.meta.url);
@@ -12,11 +12,11 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Раздача статических файлов из папки dist
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, "dist")));
 
 // Все остальные запросы отправляем на index.html (для SPA маршрутизации)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.listen(PORT, () => {

@@ -1,5 +1,6 @@
 [build]
 builder = "dockerfile"
+dockerfilePath = "Dockerfile.railway"
 
 [deploy]
 startCommand = "npm start"
@@ -9,5 +10,4 @@ restartPolicyMaxRetries = 10
 [env]
 PORT = "8080"
 NODE_ENV = "production"
-# Используем относительные пути для same-origin запросов
-VITE_API_URL = "" 
+VITE_API_URL = "https://itarent02back-production.up.railway.app" 

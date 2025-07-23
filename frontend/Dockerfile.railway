@@ -1,5 +1,5 @@
 # Многоэтапная сборка для Railway
-FROM node:18-alpine as builder
+FROM node:20-alpine as builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ ENV VITE_API_URL=https://itarent02back-production.up.railway.app
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 

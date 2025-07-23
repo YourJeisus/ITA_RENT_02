@@ -1,5 +1,5 @@
 # Dockerfile для production
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Рабочая директория
 WORKDIR /app
