@@ -1,8 +1,8 @@
 # 🛠️ Исправление краша деплоя в Railway
 
-## ❌ Проблема
+## ❌ Проблемы
 
-При деплое в Railway возникала ошибка:
+### 1. Несовместимость валидаторов Pydantic v1/v2
 
 ```
 File "/app/src/schemas/user.py", line 9, in <module>
@@ -11,7 +11,18 @@ File "/usr/local/lib/python3.11/site-packages/pydantic/_internal/_model_construc
     complete_model_class(
 ```
 
-**Причина**: Несовместимость синтаксиса валидаторов Pydantic v1 с Pydantic v2.5.0
+### 2. Отсутствие зависимости email-validator
+
+```
+ModuleNotFoundError: No module named 'email_validator'
+File "/usr/local/lib/python3.11/site-packages/pydantic/networks.py", line 352, in import_email_validator
+    import email_validator
+```
+
+**Причины**:
+
+- Несовместимость синтаксиса валидаторов Pydantic v1 с Pydantic v2.5.0
+- Отсутствие зависимости `email-validator` для работы `EmailStr`
 
 ## ✅ Решение
 
@@ -56,9 +67,18 @@ except ImportError:
     from pydantic.networks import EmailStr
 ```
 
-### 3. Обновленные файлы
+### 3. Добавлена зависимость email-validator
 
-- ✅ `src/schemas/user.py` - валидация пароля
+**Добавлено в requirements.txt**:
+
+```
+email-validator==2.2.0
+```
+
+### 4. Обновленные файлы
+
+- ✅ `requirements.txt` - добавлена зависимость email-validator
+- ✅ `src/schemas/user.py` - валидация пароля и импорт EmailStr
 - ✅ `src/schemas/filter.py` - валидация всех полей фильтра
 - ✅ `src/schemas/listing.py` - валидация источника и типа недвижимости
 - ✅ `src/schemas/auth.py` - импорт EmailStr
@@ -73,6 +93,9 @@ python -c "from src.schemas.user import UserCreate; print('User schemas OK')"
 
 python -c "from src.main import app; print('Main app import OK')"
 # Main app import OK
+
+python -c "from src.schemas.user import UserCreate; u = UserCreate(email='test@example.com', password='12345678', first_name='Test'); print('EmailStr validation OK')"
+# EmailStr validation OK
 ```
 
 ## 📊 Результат

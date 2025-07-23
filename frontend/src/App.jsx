@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Home, Search, Settings, User } from "lucide-react";
 import "./App.css";
 
 function App() {
@@ -26,20 +25,20 @@ function App() {
       <header className="header">
         <div className="container">
           <div className="logo">
-            <Home size={32} />
+            <span style={{ fontSize: "32px" }}>🏠</span>
             <h1>ITA Rent Bot</h1>
           </div>
           <nav className="nav">
             <a href="#" className="nav-link">
-              <Search size={20} />
+              <span style={{ fontSize: "20px" }}>🔍</span>
               Поиск
             </a>
             <a href="#" className="nav-link">
-              <User size={20} />
+              <span style={{ fontSize: "20px" }}>👤</span>
               Профиль
             </a>
             <a href="#" className="nav-link">
-              <Settings size={20} />
+              <span style={{ fontSize: "20px" }}>⚙️</span>
               Настройки
             </a>
           </nav>
