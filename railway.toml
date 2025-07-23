@@ -1,3 +1,4 @@
+# Railway конфигурация для полного деплоя ITA_RENT_BOT
 [[services]]
 name = "backend"
 source = "."
@@ -7,6 +8,7 @@ build.dockerfilePath = "Dockerfile.prod"
 [services.backend.deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
+restartPolicyType = "always"
 
 [services.backend.env]
 PYTHONPATH = "/app"
@@ -21,7 +23,36 @@ build.dockerfilePath = "Dockerfile.railway"
 [services.frontend.deploy]
 healthcheckPath = "/"
 healthcheckTimeout = 300
+restartPolicyType = "always"
 
 [services.frontend.env]
 NODE_ENV = "production"
-VITE_API_URL = "https://itarent02back-production.up.railway.app" 
+VITE_API_URL = "https://itarent02back-production.up.railway.app"
+
+# Новый сервис для автоматического парсинга каждые 6 часов
+[[services]]
+name = "scraper-worker"
+source = "."
+build.builder = "dockerfile"
+build.dockerfilePath = "Dockerfile.scraper"
+
+[services.scraper-worker.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+[services.scraper-worker.env]
+PYTHONPATH = "/app"
+ENVIRONMENT = "production"
+WORKER_TYPE = "scraper"
+
+# PostgreSQL база данных
+[[services]]
+name = "postgres"
+source = ""
+build.builder = "dockerfile"
+
+[services.postgres.deploy]
+healthcheckPath = ""
+healthcheckTimeout = 300
+restartPolicyType = "always" 

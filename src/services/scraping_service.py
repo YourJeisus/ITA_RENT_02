@@ -102,11 +102,11 @@ class ScrapingService:
         logger.info(f"📊 Всего получено {len(all_listings)} объявлений из всех источников")
         return all_listings
     
-    async def save_listings_to_db(
+    def save_listings_to_db(
         self,
         listings: List[Dict[str, Any]],
         db: Session
-    ) -> int:
+    ) -> Dict[str, int]:
         """
         Сохраняет объявления в базу данных с дедупликацией
         
@@ -115,14 +115,12 @@ class ScrapingService:
             db: Сессия базы данных
             
         Returns:
-            int: Количество сохраненных объявлений
+            Dict[str, int]: Статистика сохранения
         """
         if not listings:
-            return 0
+            return {"created": 0, "updated": 0, "errors": 0}
             
-        saved_count = 0
-        duplicate_count = 0
-        error_count = 0
+        stats = {"created": 0, "updated": 0, "errors": 0}
         
         logger.info(f"💾 Сохраняем {len(listings)} объявлений в базу данных...")
         
@@ -134,7 +132,7 @@ class ScrapingService:
                 
                 if not external_id:
                     logger.warning("⚠️ Объявление без external_id, пропускаем")
-                    error_count += 1
+                    stats["errors"] += 1
                     continue
                 
                 existing = crud_listing.get_by_external_id(
@@ -147,27 +145,27 @@ class ScrapingService:
                     # Обновляем существующее объявление
                     listing_update = ListingCreate(**listing_data)
                     crud_listing.update(db=db, db_obj=existing, obj_in=listing_update)
-                    duplicate_count += 1
+                    stats["updated"] += 1
                     logger.debug(f"🔄 Обновлено объявление {external_id}")
                 else:
                     # Создаем новое объявление
                     listing_create = ListingCreate(**listing_data)
                     crud_listing.create(db=db, obj_in=listing_create)
-                    saved_count += 1
+                    stats["created"] += 1
                     logger.debug(f"✅ Создано объявление {external_id}")
                     
             except Exception as e:
                 logger.error(f"❌ Ошибка сохранения объявления: {e}")
                 logger.debug(f"Данные объявления: {listing_data}")
-                error_count += 1
+                stats["errors"] += 1
                 continue
         
         logger.info(f"📊 Результаты сохранения:")
-        logger.info(f"   ✅ Новых объявлений: {saved_count}")
-        logger.info(f"   🔄 Обновленных: {duplicate_count}")
-        logger.info(f"   ❌ Ошибок: {error_count}")
+        logger.info(f"   ✅ Новых объявлений: {stats['created']}")
+        logger.info(f"   🔄 Обновленных: {stats['updated']}")
+        logger.info(f"   ❌ Ошибок: {stats['errors']}")
         
-        return saved_count
+        return stats
     
     async def scrape_and_save(
         self,
@@ -202,7 +200,7 @@ class ScrapingService:
                 }
             
             # Шаг 2: Сохранение в БД
-            saved_count = await self.save_listings_to_db(listings, db)
+            saved_stats = self.save_listings_to_db(listings, db)
             
             elapsed_time = (datetime.now() - start_time).total_seconds()
             
@@ -210,7 +208,9 @@ class ScrapingService:
                 "success": True,
                 "message": f"Успешно обработано {len(listings)} объявлений",
                 "scraped_count": len(listings),
-                "saved_count": saved_count,
+                "saved_count": saved_stats["created"],
+                "updated_count": saved_stats["updated"],
+                "error_count": saved_stats["errors"],
                 "sources": ["immobiliare"],
                 "elapsed_time": elapsed_time
             }
