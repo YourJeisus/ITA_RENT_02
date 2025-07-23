@@ -15,10 +15,9 @@
 ### Шаг 1: Загрузить на GitHub
 
 ```bash
-# Создайте репозиторий на GitHub.com с именем "ITA_RENT_BOT"
-# Затем выполните:
+# Репозиторий уже создан: ita_rent_02
+# Загружаем код:
 
-git remote add origin https://github.com/YOUR_USERNAME/ITA_RENT_BOT.git
 git push -u origin main
 ```
 
@@ -27,7 +26,7 @@ git push -u origin main
 1. Зайдите на [railway.app](https://railway.app)
 2. **Login** через GitHub
 3. **New Project** → **Deploy from GitHub repo**
-4. Выберите репозиторий `ITA_RENT_BOT`
+4. Выберите репозиторий `ita_rent_02`
 
 ### Шаг 3: Railway автоматически создаст
 

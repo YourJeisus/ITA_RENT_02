@@ -146,7 +146,6 @@ docker build -f Dockerfile.prod -t ita-rent-frontend .
 1. **Создайте GitHub репозиторий и загрузите код:**
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/ITA_RENT_BOT.git
 git push -u origin main
 ```
 
