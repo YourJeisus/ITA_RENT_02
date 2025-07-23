@@ -32,6 +32,11 @@ class ListingBase(BaseModel):
     virtual_tour_url: Optional[str] = None
     agency_name: Optional[str] = None
     contact_info: Optional[Dict[str, Any]] = None
+    
+    # Дополнительные поля для скрапера V2
+    is_active: Optional[bool] = True
+    published_at: Optional[datetime] = None
+    scraped_at: Optional[datetime] = None
 
 
 class ListingCreate(ListingBase):
@@ -48,13 +53,26 @@ class ListingCreate(ListingBase):
             raise ValueError(f'Источник должен быть одним из: {", ".join(allowed_sources)}')
         return v
     
-    @field_validator('property_type')
+    @field_validator('scraped_at', mode='before')
     @classmethod
-    def validate_property_type(cls, v):
-        if v is not None:
-            allowed_types = ['apartment', 'house', 'room', 'studio']
-            if v not in allowed_types:
-                raise ValueError(f'Тип недвижимости должен быть одним из: {", ".join(allowed_types)}')
+    def parse_scraped_at(cls, v):
+        """Парсит scraped_at из ISO строки или оставляет как есть"""
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                return None
+        return v
+    
+    @field_validator('published_at', mode='before')
+    @classmethod
+    def parse_published_at(cls, v):
+        """Парсит published_at из ISO строки или оставляет как есть"""
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                return None
         return v
 
 

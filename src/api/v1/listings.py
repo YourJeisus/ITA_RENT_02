@@ -26,13 +26,15 @@ async def search_listings(
     source_site: Optional[str] = Query(None, description="Источник (idealista, immobiliare)"),
     skip: int = Query(0, ge=0, description="Количество пропускаемых записей"),
     limit: int = Query(50, ge=1, le=100, description="Количество записей на странице"),
+    force_scraping: bool = Query(False, description="Принудительно запустить парсинг"),
+    max_pages: int = Query(5, ge=1, le=20, description="Максимальное количество страниц для парсинга"),
     db: Session = Depends(get_db)
 ):
     """
-    Поиск объявлений с фильтрами
+    Поиск объявлений с фильтрами и автоматическим парсингом
     """
     try:
-        # Сначала ищем в базе данных
+        # Формируем фильтры
         filters = {
             "city": city,
             "min_price": min_price,
@@ -48,6 +50,7 @@ async def search_listings(
         # Убираем None значения
         filters = {k: v for k, v in filters.items() if v is not None}
         
+        # Сначала ищем в базе данных
         listings_data = listing.search_with_filters(
             db=db,
             filters=filters,
@@ -57,33 +60,35 @@ async def search_listings(
         
         total_count = listing.count_with_filters(db=db, filters=filters)
         
-        # Если в базе мало результатов и это первая страница, запускаем парсинг
-        should_scrape = (
-            total_count < 10 and 
-            skip == 0 and 
-            city  # Обязательно нужен город для парсинга
-        )
+        # Определяем, нужен ли парсинг (только по явному запросу)
+        should_scrape = force_scraping
         
         search_type = "database"
         search_message = f"Найдено {total_count} объявлений в базе данных"
+        scraping_stats = None
         
         if should_scrape:
             try:
+                # Создаем новый асинхронный сервис парсинга
                 scraping_service = ScrapingService()
+                
+                # Формируем фильтры для парсинга
                 scraping_filters = {
-                    "city": city,
+                    "city": city or "roma",  # По умолчанию Рим
                     "min_price": min_price,
                     "max_price": max_price,
                     "property_type": property_type,
                     "min_rooms": min_rooms
                 }
                 
-                scraped_listings = await scraping_service.scrape_all_sources(
+                # Запускаем асинхронный парсинг с сохранением в БД
+                scraping_result = await scraping_service.scrape_and_save(
                     filters=scraping_filters,
-                    max_pages=2
+                    db=db,
+                    max_pages=max_pages
                 )
                 
-                if scraped_listings:
+                if scraping_result.get("success"):
                     # Обновляем результаты после парсинга
                     listings_data = listing.search_with_filters(
                         db=db,
@@ -92,15 +97,39 @@ async def search_listings(
                         limit=limit
                     )
                     total_count = listing.count_with_filters(db=db, filters=filters)
+                    
                     search_type = "scraping"
-                    search_message = f"Найдено {len(scraped_listings)} новых объявлений через парсинг. Всего в базе: {total_count}"
+                    search_message = (
+                        f"Найдено {scraping_result['scraped_count']} новых объявлений через парсинг. "
+                        f"Сохранено: {scraping_result['saved_count']}. Всего в базе: {total_count}"
+                    )
+                    
+                    scraping_stats = {
+                        "scraped_count": scraping_result["scraped_count"],
+                        "saved_count": scraping_result["saved_count"],
+                        "sources": scraping_result["sources"],
+                        "elapsed_time": scraping_result["elapsed_time"]
+                    }
+                else:
+                    search_message += f". Парсинг не удался: {scraping_result.get('message', 'Неизвестная ошибка')}"
                 
             except Exception as e:
                 # Если парсинг не удался, продолжаем с результатами из базы
+                search_message += f". Ошибка парсинга: {str(e)}"
                 print(f"Scraping failed: {e}")
         
-        return {
+        # Формируем ответ
+        response_data = {
             "success": True,
+            "search_type": search_type,
+            "message": search_message,
+            "total_count": total_count,
+            "returned_count": len(listings_data),
+            "page_info": {
+                "skip": skip,
+                "limit": limit,
+                "has_more": total_count > skip + limit
+            },
             "listings": [
                 {
                     "id": str(l.id),
@@ -118,28 +147,36 @@ async def search_listings(
                     "longitude": l.longitude,
                     "area_sqm": l.area,
                     "num_rooms": l.rooms,
-                    "num_bedrooms": l.bedrooms,
                     "num_bathrooms": l.bathrooms,
-                    "floor": l.floor,
                     "property_type": l.property_type,
-                    "features": [],  # TODO: добавить поддержку features
-                    "photos_urls": l.images if l.images else [],
-                    "published_at": l.scraped_at.isoformat() if l.scraped_at else None,
+                    "floor": l.floor,
+                    "is_furnished": l.furnished,
+                    "pets_allowed": l.pets_allowed,
+                    "features": l.features if hasattr(l, 'features') else [],
+                    "images": l.images if l.images else [],
+                    "virtual_tour_url": l.virtual_tour_url,
+                    "agency_name": l.agency_name if hasattr(l, 'agency_name') else None,
+                    "is_active": l.is_active,
+                    "published_at": l.published_at.isoformat() if l.published_at else None,
+                    "scraped_at": l.scraped_at.isoformat() if l.scraped_at else None,
                     "created_at": l.created_at.isoformat() if l.created_at else None,
-                    "last_seen_at": l.updated_at.isoformat() if l.updated_at else None,
-                    "is_available": l.is_active
+                    "updated_at": l.updated_at.isoformat() if l.updated_at else None
                 }
                 for l in listings_data
-            ],
-            "total_count": total_count,
-            "returned_count": len(listings_data),
-            "search_type": search_type,
-            "message": search_message,
-            "filters_used": filters
+            ]
         }
         
+        # Добавляем статистику парсинга, если она есть
+        if scraping_stats:
+            response_data["scraping_stats"] = scraping_stats
+        
+        return response_data
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка поиска: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при поиске объявлений: {str(e)}"
+        )
 
 
 @router.get("/{listing_id}", response_model=dict)
@@ -148,61 +185,111 @@ async def get_listing(
     db: Session = Depends(get_db)
 ):
     """
-    Получение детальной информации об объявлении
+    Получить детали конкретного объявления
     """
-    listing_obj = listing.get(db=db, id=listing_id)
-    if not listing_obj:
-        raise HTTPException(status_code=404, detail="Объявление не найдено")
-    
-    return {
-        "id": str(listing_obj.id),
-        "source_site": listing_obj.source,
-        "original_id": listing_obj.external_id,
-        "url": listing_obj.url,
-        "title": listing_obj.title,
-        "description": listing_obj.description,
-        "price": listing_obj.price,
-        "currency": listing_obj.price_currency,
-        "address_text": listing_obj.address,
-        "city": listing_obj.city,
-        "district": listing_obj.district,
-        "latitude": listing_obj.latitude,
-        "longitude": listing_obj.longitude,
-        "area_sqm": listing_obj.area,
-        "num_rooms": listing_obj.rooms,
-        "num_bedrooms": listing_obj.bedrooms,
-        "num_bathrooms": listing_obj.bathrooms,
-        "floor": listing_obj.floor,
-        "property_type": listing_obj.property_type,
-        "features": [],
-        "photos_urls": listing_obj.images if listing_obj.images else [],
-        "published_at": listing_obj.scraped_at.isoformat() if listing_obj.scraped_at else None,
-        "created_at": listing_obj.created_at.isoformat() if listing_obj.created_at else None,
-        "last_seen_at": listing_obj.updated_at.isoformat() if listing_obj.updated_at else None,
-        "is_available": listing_obj.is_active
-    }
+    try:
+        listing_obj = listing.get(db=db, id=listing_id)
+        
+        if not listing_obj:
+            raise HTTPException(
+                status_code=404,
+                detail="Объявление не найдено"
+            )
+        
+        return {
+            "success": True,
+            "listing": {
+                "id": str(listing_obj.id),
+                "source_site": listing_obj.source,
+                "original_id": listing_obj.external_id,
+                "url": listing_obj.url,
+                "title": listing_obj.title,
+                "description": listing_obj.description,
+                "price": listing_obj.price,
+                "currency": listing_obj.price_currency,
+                "address_text": listing_obj.address,
+                "city": listing_obj.city,
+                "district": listing_obj.district,
+                "latitude": listing_obj.latitude,
+                "longitude": listing_obj.longitude,
+                "area_sqm": listing_obj.area,
+                "num_rooms": listing_obj.rooms,
+                "num_bathrooms": listing_obj.bathrooms,
+                "property_type": listing_obj.property_type,
+                "floor": listing_obj.floor,
+                "is_furnished": listing_obj.furnished,
+                "pets_allowed": listing_obj.pets_allowed,
+                "features": listing_obj.features if hasattr(listing_obj, 'features') else [],
+                "images": listing_obj.images if listing_obj.images else [],
+                "virtual_tour_url": listing_obj.virtual_tour_url,
+                "agency_name": listing_obj.agency_name if hasattr(listing_obj, 'agency_name') else None,
+                "is_active": listing_obj.is_active,
+                "published_at": listing_obj.published_at.isoformat() if listing_obj.published_at else None,
+                "scraped_at": listing_obj.scraped_at.isoformat() if listing_obj.scraped_at else None,
+                "created_at": listing_obj.created_at.isoformat() if listing_obj.created_at else None,
+                "updated_at": listing_obj.updated_at.isoformat() if listing_obj.updated_at else None
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при получении объявления: {str(e)}"
+        )
 
 
-@router.get("/suggestions/cities", response_model=List[str])
-async def get_cities(
+@router.post("/scrape", response_model=dict)
+async def manual_scraping(
+    city: str = Query("roma", description="Город для парсинга"),
+    max_pages: int = Query(5, ge=1, le=20, description="Максимальное количество страниц"),
+    save_to_db: bool = Query(True, description="Сохранять результаты в базу данных"),
     db: Session = Depends(get_db)
 ):
     """
-    Получение списка доступных городов
+    Ручной запуск парсинга объявлений
     """
-    cities = listing.get_available_cities(db=db)
-    return cities
+    try:
+        scraping_service = ScrapingService()
+        
+        scraping_filters = {
+            "city": city
+        }
+        
+        if save_to_db:
+            # Парсинг с сохранением в БД
+            result = await scraping_service.scrape_and_save(
+                filters=scraping_filters,
+                db=db,
+                max_pages=max_pages
+            )
+            
+            return {
+                "success": result["success"],
+                "message": result["message"],
+                "scraped_count": result["scraped_count"],
+                "saved_count": result["saved_count"],
+                "sources": result["sources"],
+                "elapsed_time": result["elapsed_time"]
+            }
+        else:
+            # Только парсинг без сохранения
+            listings = await scraping_service.scrape_all_sources(
+                filters=scraping_filters,
+                max_pages=max_pages
+            )
+            
+            return {
+                "success": True,
+                "message": f"Найдено {len(listings)} объявлений",
+                "scraped_count": len(listings),
+                "sources": ["immobiliare"],
+                "listings": listings[:10]  # Возвращаем первые 10 для примера
+            }
 
-
-@router.get("/stats/database", response_model=dict)
-async def get_database_stats(
-    db: Session = Depends(get_db)
-):
-    """
-    Статистика базы данных объявлений
-    """
-    stats = listing.get_database_stats(db=db)
-    return {
-        "success": True,
-        "stats": stats
-    } 
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при парсинге: {str(e)}"
+        ) 

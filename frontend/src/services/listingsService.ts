@@ -115,6 +115,13 @@ class ListingsService {
 
   // Конвертируем ответ API в формат Listing
   convertApiListingToListing(apiListing: any): Listing {
+    // Отладочная информация
+    console.log("Converting listing:", {
+      id: apiListing.id,
+      images: apiListing.images?.length || 0,
+      photos_urls: apiListing.photos_urls?.length || 0,
+    });
+
     return {
       id: apiListing.id,
       source_site: apiListing.source_site,
@@ -138,7 +145,7 @@ class ListingsService {
       property_type: apiListing.property_type,
       listing_type: apiListing.listing_type,
       features: apiListing.features || [],
-      photos_urls: apiListing.photos_urls || [],
+      photos_urls: apiListing.images || apiListing.photos_urls || [],
       published_at: apiListing.published_at,
       created_at: apiListing.created_at,
       last_seen_at: apiListing.last_seen_at,
@@ -146,7 +153,7 @@ class ListingsService {
 
       // Для обратной совместимости с существующими компонентами
       address: apiListing.address_text,
-      imageUrls: apiListing.photos_urls || [],
+      imageUrls: apiListing.images || apiListing.photos_urls || [],
       source: apiListing.source_site,
       originalUrl: apiListing.url,
       type: apiListing.property_type,
