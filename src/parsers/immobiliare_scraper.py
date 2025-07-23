@@ -645,12 +645,15 @@ class ImmobiliareScraper:
             'Villa': 'house',
             'Casa': 'house',
             'Villetta': 'house',
-            'Attico': 'apartment',
+            'Attico': 'penthouse',         # Исправлено: пентхаус
+            'Superattico': 'penthouse',    # Супер-пентхаус
             'Loft': 'apartment',
-            'Monolocale': 'studio',
+            'Monolocale': 'studio',        # Студия
+            'Studio': 'studio',            # Студия (англ.)
             'Bilocale': 'apartment',
             'Trilocale': 'apartment',
             'Quadrilocale': 'apartment',
+            'Plurilocale': 'apartment',
             'Stanza': 'room',
             'Posto letto': 'room',
             'Camera': 'room'
@@ -660,11 +663,15 @@ class ImmobiliareScraper:
             return type_mapping[property_type]
         
         title_lower = title.lower()
-        if 'monolocale' in title_lower or 'studio' in title_lower:
+        
+        # Приоритетный анализ заголовка
+        if any(word in title_lower for word in ['attico', 'superattico', 'penthouse']):
+            return 'penthouse'
+        elif any(word in title_lower for word in ['monolocale', 'studio']):
             return 'studio'
         elif any(word in title_lower for word in ['villa', 'casa', 'villetta']):
             return 'house'
-        elif any(word in title_lower for word in ['stanza', 'posto letto', 'camera']):
+        elif any(word in title_lower for word in ['stanza', 'posto letto', 'camera', 'room']):
             return 'room'
         
         return 'apartment'
