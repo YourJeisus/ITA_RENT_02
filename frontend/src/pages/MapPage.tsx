@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import MapView from '../components/map/MapView';
-import { listingsService } from '../services/listingsService';
-import styles from './MapPage.module.scss';
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import MapView from "../components/map/MapView";
+import { listingsService } from "../services/listingsService";
+import styles from "./MapPage.module.scss";
 
 interface Listing {
   id: number;
@@ -32,37 +32,37 @@ const MapPage: React.FC = () => {
 
         // Получаем параметры поиска из URL
         const searchFilters = {
-          city: searchParams.get('city') || 'roma',
-          min_price: searchParams.get('min_price')
-            ? parseInt(searchParams.get('min_price')!)
+          city: searchParams.get("city") || "roma",
+          min_price: searchParams.get("min_price")
+            ? parseInt(searchParams.get("min_price")!)
             : undefined,
-          max_price: searchParams.get('max_price')
-            ? parseInt(searchParams.get('max_price')!)
+          max_price: searchParams.get("max_price")
+            ? parseInt(searchParams.get("max_price")!)
             : undefined,
-          min_area: searchParams.get('min_area')
-            ? parseInt(searchParams.get('min_area')!)
+          min_area: searchParams.get("min_area")
+            ? parseInt(searchParams.get("min_area")!)
             : undefined,
-          max_area: searchParams.get('max_area')
-            ? parseInt(searchParams.get('max_area')!)
+          max_area: searchParams.get("max_area")
+            ? parseInt(searchParams.get("max_area")!)
             : undefined,
-          rooms_count: searchParams.get('rooms_count')
-            ? parseInt(searchParams.get('rooms_count')!)
+          rooms_count: searchParams.get("rooms_count")
+            ? parseInt(searchParams.get("rooms_count")!)
             : undefined,
-          property_type: searchParams.get('property_type') || undefined,
-          source_site: searchParams.get('source_site') || undefined,
+          property_type: searchParams.get("property_type") || undefined,
+          source_site: searchParams.get("source_site") || undefined,
         };
 
         console.log(
-          '🗺️ Загрузка объявлений для карты с фильтрами:',
+          "🗺️ Загрузка объявлений для карты с фильтрами:",
           searchFilters
         );
 
-        // Используем быстрый поиск в базе данных
-        const response = await listingsService.fastSearch(
-          searchFilters,
-          0,
-          1000
-        );
+        // Используем поиск в базе данных
+        const response = await listingsService.searchListings({
+          ...searchFilters,
+          skip: 0,
+          limit: 1000,
+        });
 
         if (response.success) {
           setListings(response.listings || []);
@@ -70,11 +70,11 @@ const MapPage: React.FC = () => {
             `✅ Загружено ${response.listings?.length || 0} объявлений для карты из базы данных`
           );
         } else {
-          throw new Error(response.error || 'Ошибка загрузки данных');
+          throw new Error(response.error || "Ошибка загрузки данных");
         }
       } catch (err) {
-        console.error('❌ Ошибка загрузки объявлений для карты:', err);
-        setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
+        console.error("❌ Ошибка загрузки объявлений для карты:", err);
+        setError(err instanceof Error ? err.message : "Неизвестная ошибка");
       } finally {
         setLoading(false);
       }
