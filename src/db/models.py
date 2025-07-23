@@ -164,7 +164,7 @@ class Listing(Base):
     bedrooms: Mapped[Optional[int]] = mapped_column(Integer)
     bathrooms: Mapped[Optional[int]] = mapped_column(Integer)
     area: Mapped[Optional[float]] = mapped_column(Float, index=True)  # площадь в м²
-    floor: Mapped[Optional[str]] = mapped_column(String(20))
+    floor: Mapped[Optional[str]] = mapped_column(String(100))
     total_floors: Mapped[Optional[int]] = mapped_column(Integer)
     
     # Дополнительные характеристики
