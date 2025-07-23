@@ -13,8 +13,8 @@ import {
   Divider,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '@/services/authService';
-import { useAuthStore } from '@/store/authStore';
+import { authService } from '../../services/authService';
+import { useAuthStore } from '../../store/authStore';
 import TelegramLoginWidget from './TelegramLoginWidget';
 import styles from './AuthForm.module.scss';
 // import { GoogleLogin } from '@react-oauth/google'; // Temporarily disabled

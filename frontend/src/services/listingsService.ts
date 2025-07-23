@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import { Listing, ApiResponse, FilterState } from "@/types";
+import { Listing, ApiResponse, FilterState } from "../types";
 
 interface SearchParams {
   skip?: number;

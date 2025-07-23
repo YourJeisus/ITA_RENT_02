@@ -19,12 +19,12 @@ import {
   Link as LinkIcon,
   DeleteSweep as DeleteSweepIcon,
 } from '@mui/icons-material';
-import { useAuthStore } from '@/store/authStore';
-import { filtersService } from '@/services/filtersService';
-import { userService } from '@/services/userService';
-import { Filter } from '@/types';
+import { useAuthStore } from '../store/authStore';
+import { filtersService } from '../services/filtersService';
+import { userService } from '../services/userService';
+import { Filter } from '../types';
 import styles from './FiltersPage.module.scss';
-import TelegramLinkDialog from '@/components/auth/TelegramLinkDialog';
+import TelegramLinkDialog from '../components/auth/TelegramLinkDialog';
 
 const FiltersPage: React.FC = () => {
   const { user, checkAuth } = useAuthStore();

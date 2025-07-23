@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Typography, Box } from '@mui/material';
-import AuthForm from '@/components/auth/AuthForm';
+import AuthForm from '../components/auth/AuthForm';
 import styles from './AuthPage.module.scss';
 
 const AuthPage: React.FC = () => {

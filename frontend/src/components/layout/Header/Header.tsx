@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Menu, MenuItem, IconButton, Avatar } from '@mui/material';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '../../../store/authStore';
 import styles from './Header.module.scss';
 
 const Header: React.FC = () => {

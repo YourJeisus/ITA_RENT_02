@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFilterStore } from '@/store/filterStore';
-import { City, PropertyType, TransactionType } from '@/types';
-import SubscriptionModal from '@/components/common/SubscriptionModal';
+import { useFilterStore } from '../../../store/filterStore';
+import { City, PropertyType, TransactionType } from '../../../types';
+import SubscriptionModal from '../../../components/common/SubscriptionModal';
 import styles from './HeroFilters.module.scss';
 
 // Города Италии

@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { User } from '@/types';
+import { User } from '../types';
 
 interface LoginResponse {
   access_token: string;

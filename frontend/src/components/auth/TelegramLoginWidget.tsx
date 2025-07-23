@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { authService } from '@/services/authService';
+import { useAuthStore } from '../../store/authStore';
+import { authService } from '../../services/authService';
 import './TelegramLoginWidget.scss';
 
 interface TelegramLoginWidgetProps {

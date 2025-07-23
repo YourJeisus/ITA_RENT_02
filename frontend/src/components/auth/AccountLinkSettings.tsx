@@ -16,7 +16,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
-import { authService } from '@/services/authService';
+import { authService } from '../../services/authService';
 import TelegramLoginWidget from './TelegramLoginWidget';
 import './AccountLinkSettings.scss';
 

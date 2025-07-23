@@ -14,8 +14,8 @@ import {
   Link,
 } from '@mui/material';
 import { ContentCopy as ContentCopyIcon } from '@mui/icons-material';
-import { userService } from '@/services/userService';
-import { useAuthStore } from '@/store/authStore';
+import { userService } from '../../services/userService';
+import { useAuthStore } from '../../store/authStore';
 
 interface TelegramLinkDialogProps {
   open: boolean;

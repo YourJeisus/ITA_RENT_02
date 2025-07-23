@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './SubscriptionModal.scss';
-import apiClient from '@/services/apiClient';
+import apiClient from '../../services/apiClient';
 
 interface SubscriptionModalProps {
   isOpen: boolean;

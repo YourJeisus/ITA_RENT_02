@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { Listing, FilterState } from "@/types";
-import { listingsService } from "@/services/listingsService";
+import { Listing, FilterState } from "../types";
+import { listingsService } from "../services/listingsService";
 
 interface ListingState {
   listings: Listing[];

@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { User } from '@/types';
+import { User } from '../types';
 
 interface TelegramCodeResponse {
   code: string;

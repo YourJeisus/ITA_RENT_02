@@ -6,7 +6,7 @@ import {
   PropertyType,
   TransactionType,
   RoomOption,
-} from '@/types';
+} from '../types';
 
 const initialFilters: FilterState = {
   city: { id: 'rome', name: 'Рим' },

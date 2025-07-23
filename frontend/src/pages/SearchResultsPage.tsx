@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CircularProgress, Alert, Pagination, Box } from '@mui/material';
 import ListingCard from '../components/search/ListingCard/ListingCard';
-import { useListingStore } from '@/store/listingStore';
-import { FilterState } from '@/types';
-import SearchStatus from '@/components/common/SearchStatus';
-import FiltersSidebar from '@/components/search/FiltersSidebar/FiltersSidebar';
+import { useListingStore } from '../store/listingStore';
+import { FilterState } from '../types';
+import SearchStatus from '../components/common/SearchStatus';
+import FiltersSidebar from '../components/search/FiltersSidebar/FiltersSidebar';
 import styles from './SearchResultsPage.module.scss';
 
 const SearchResultsPage: React.FC = () => {

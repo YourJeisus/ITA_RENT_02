@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { Filter } from '@/types';
+import { Filter } from '../types';
 
 interface FilterUpdateData {
   name?: string;

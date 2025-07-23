@@ -76,7 +76,7 @@ apiClient.interceptors.response.use(
 export default apiClient;
 
 // --- Моковые функции для разработки UI пока нет бэкенда для них ---
-import { City, FilterState, Listing, ApiResponse } from '@/types'; // Убедитесь, что путь правильный
+import { City, FilterState, Listing, ApiResponse } from '../types'; // Убедитесь, что путь правильный
 
 const mockCitiesData: City[] = [
   { id: 'rome', name: 'Рим' },
