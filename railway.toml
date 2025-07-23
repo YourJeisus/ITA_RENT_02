@@ -25,9 +25,7 @@ healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "always"
 
-[services.frontend.env]
-NODE_ENV = "production"
-VITE_API_URL = "https://itarent02back-production.up.railway.app"
+# ENV переменные уже настроены в Dockerfile.railway
 
 # Новый сервис для автоматического парсинга каждые 6 часов
 [[services]]
