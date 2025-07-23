@@ -143,40 +143,40 @@ class Listing(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     
-    # Идентификация источника
+    # Основная информация об объявлении
     external_id: Mapped[str] = mapped_column(String(255), index=True)  # ID на сайте-источнике
     source: Mapped[str] = mapped_column(String(50), index=True)  # idealista, immobiliare, subito
-    url: Mapped[str] = mapped_column(String(1024), unique=True)
+    url: Mapped[str] = mapped_column(Text, unique=True)  # Убираем ограничение на URL
     
-    # Основная информация
-    title: Mapped[str] = mapped_column(String(512))
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    # Контент объявления
+    title: Mapped[str] = mapped_column(Text)  # Убираем ограничение на заголовок
+    description: Mapped[Optional[str]] = mapped_column(Text)  # Уже Text
     
-    # Цена
+    # Финансовая информация
     price: Mapped[Optional[float]] = mapped_column(Float, index=True)
     price_currency: Mapped[str] = mapped_column(String(10), default="EUR")
     
     # Характеристики недвижимости
     property_type: Mapped[Optional[str]] = mapped_column(
         String(50), index=True
-    )  # apartment, house, room, studio
+    )  # apartment, house, room, studio, commercial
     rooms: Mapped[Optional[int]] = mapped_column(Integer, index=True)
     bedrooms: Mapped[Optional[int]] = mapped_column(Integer)
     bathrooms: Mapped[Optional[int]] = mapped_column(Integer)
     area: Mapped[Optional[float]] = mapped_column(Float, index=True)  # площадь в м²
-    floor: Mapped[Optional[str]] = mapped_column(String(100))
+    floor: Mapped[Optional[str]] = mapped_column(Text)  # Убираем ограничение - может быть JSON
     total_floors: Mapped[Optional[int]] = mapped_column(Integer)
     
     # Дополнительные характеристики
-    furnished: Mapped[Optional[bool]] = mapped_column(Boolean)
+    furnished: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)
     pets_allowed: Mapped[Optional[bool]] = mapped_column(Boolean)
-    features: Mapped[Optional[List[str]]] = mapped_column(JSON)  # балкон, лифт, парковка и т.д.
+    features: Mapped[Optional[List[str]]] = mapped_column(JSON)  # список особенностей
     
-    # Местоположение
-    address: Mapped[Optional[str]] = mapped_column(String(512))
+    # Геолокация
+    address: Mapped[Optional[str]] = mapped_column(Text)  # Убираем ограничение на адрес
     city: Mapped[str] = mapped_column(String(100), index=True)
     district: Mapped[Optional[str]] = mapped_column(String(100), index=True)
-    postal_code: Mapped[Optional[str]] = mapped_column(String(20))
+    postal_code: Mapped[Optional[str]] = mapped_column(String(50))  # Увеличиваем с 20 до 50
     latitude: Mapped[Optional[float]] = mapped_column(Float)
     longitude: Mapped[Optional[float]] = mapped_column(Float)
     
