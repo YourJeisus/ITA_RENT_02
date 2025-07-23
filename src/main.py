@@ -32,7 +32,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001", 
     "http://127.0.0.1:8000",
-
+    "https://itarent02front-production.up.railway.app",  # Production frontend
 ]
 
 # Добавляем дополнительные origins из переменных окружения
