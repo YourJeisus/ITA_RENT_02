@@ -5,13 +5,16 @@ WORKDIR /app
 
 # Копируем package files
 COPY package*.json ./
-RUN npm ci
+
+# Установка всех зависимостей (включая dev)
+RUN npm ci --verbose
 
 # Копируем весь код
 COPY . .
 
 # Переменные окружения для сборки
 ENV VITE_API_URL=https://itarent02back-production.up.railway.app
+ENV NODE_ENV=production
 
 # Сборка приложения
 RUN npm run build
@@ -23,9 +26,11 @@ WORKDIR /app
 
 # Копируем package.json для production зависимостей
 COPY package*.json ./
-RUN npm ci --only=production
 
-# Копируем собранное приложение
+# Установка только production зависимостей с обновленным флагом
+RUN npm ci --omit=dev --verbose
+
+# Копируем собранное приложение и сервер
 COPY --from=builder /app/dist ./dist
 COPY server.js ./
 
