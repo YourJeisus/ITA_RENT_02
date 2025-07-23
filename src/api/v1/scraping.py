@@ -301,21 +301,18 @@ async def run_scraping_public(
             "property_type": "apartment"
         }
         
-        # Запускаем парсинг
-        stats = scraping_service.scrape_and_save(
+        # Запускаем парсинг с правильными параметрами
+        stats = await scraping_service.scrape_and_save(
             filters=filters,
             db=db,
-            sources=None,  # все источники
-            max_pages=max_pages,
-            use_scraperapi=True,
-            update_existing=True
+            max_pages=max_pages
         )
         
         logger.info(f"Публичный парсинг завершен: {stats}")
         
         return ScrapingResponse(
             success=True,
-            message=f"Парсинг завершен успешно. Обработано {stats['total_scraped']} объявлений.",
+            message=f"Парсинг завершен успешно. Обработано {stats.get('scraped_count', 0)} объявлений.",
             stats=stats
         )
         
