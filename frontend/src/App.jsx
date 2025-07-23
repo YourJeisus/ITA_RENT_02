@@ -8,7 +8,8 @@ function App() {
 
   useEffect(() => {
     // Проверяем статус API
-    fetch("/health")
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    fetch(`${apiUrl}/health`)
       .then((response) => response.json())
       .then((data) => {
         setApiStatus(data);
@@ -101,7 +102,9 @@ function App() {
 
             <div className="cta">
               <a
-                href="/docs"
+                href={`${
+                  import.meta.env.VITE_API_URL || "http://localhost:8000"
+                }/docs`}
                 className="btn btn-primary"
                 target="_blank"
                 rel="noopener noreferrer"
