@@ -21,7 +21,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.parsers.immobiliare_parser import ImmobiliareParser
+from src.parsers.immobiliare_scraper import ImmobiliareScraper
 from src.services.scraping_service import ScrapingService
 from src.db.database import SessionLocal
 
@@ -57,12 +57,13 @@ async def main():
     print("💡 Для ускорения на 4%: python run_scraping.py --no-geo")
     print("=" * 60)
     
-    # Инициализируем парсер с выбранными настройками
-    parser = ImmobiliareParser(enable_geocoding=enable_geocoding)
+    # Инициализируем скрапер с выбранными настройками
+    scraper = ImmobiliareScraper(enable_geocoding=enable_geocoding)
     scraping_service = ScrapingService()
     
     # Проверяем ScraperAPI ключ
-    if not parser.scraperapi_key:
+    from src.core.config import settings
+    if not settings.SCRAPERAPI_KEY:
         print("❌ ОШИБКА: SCRAPERAPI_KEY не настроен!")
         print("💡 Добавьте SCRAPERAPI_KEY в файл .env")
         return
@@ -77,7 +78,7 @@ async def main():
         import time
         start_time = time.time()
         
-        listings = await parser.scrape_all_listings(max_pages=10)
+        listings = await scraper.scrape_multiple_pages(max_pages=10)
         
         end_time = time.time()
         execution_time = end_time - start_time

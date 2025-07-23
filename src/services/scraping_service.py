@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from src.parsers.immobiliare_async_scraper_v2 import ImmobiliareAsyncScraperV2
+from src.parsers.immobiliare_scraper import ImmobiliareScraper
 from src.crud.crud_listing import listing as crud_listing
 from src.schemas.listing import ListingCreate
 from src.db.models import Listing
@@ -22,8 +22,8 @@ class ScrapingService:
     """
     
     def __init__(self):
-        # Инициализируем новый асинхронный скрапер
-        self.immobiliare_scraper = ImmobiliareAsyncScraperV2(enable_geocoding=True)
+        # Инициализируем асинхронный скрапер
+        self.immobiliare_scraper = ImmobiliareScraper(enable_geocoding=True)
         
         # Настройки по умолчанию
         self.default_max_pages = 5

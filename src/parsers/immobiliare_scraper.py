@@ -25,7 +25,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class ImmobiliareAsyncScraperV2:
+class ImmobiliareScraper:
     """
     Новый асинхронный скрапер для Immobiliare.it
     Правильная реализация ScraperAPI Async API
