@@ -1,28 +1,33 @@
-# Railway Dockerfile для frontend (статический сервер)
-FROM node:18-alpine
+# Многоэтапная сборка для Railway
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Копирование package files
+# Копируем package files
 COPY package*.json ./
+RUN npm ci --only=production
 
-# Установка зависимостей
-RUN npm ci
-
-# Копирование исходного кода
+# Копируем весь код
 COPY . .
 
 # Сборка приложения
 RUN npm run build
 
-# Установка serve для раздачи статических файлов
-RUN npm install -g serve
+# Production stage
+FROM node:18-alpine
 
-# Переменные окружения
-ENV NODE_ENV=production
+WORKDIR /app
 
-# Порт (Railway использует переменную PORT)
-EXPOSE $PORT
+# Копируем package.json для production зависимостей
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Команда запуска с serve - разрешаем все хосты для Railway
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000} --cors --single"] 
+# Копируем собранное приложение
+COPY --from=builder /app/dist ./dist
+COPY server.js ./
+
+# Открываем порт
+EXPOSE 8080
+
+# Запуск production сервера
+CMD ["node", "server.js"] 
