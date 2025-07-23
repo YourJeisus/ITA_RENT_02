@@ -3,7 +3,7 @@ Pydantic схемы для объявлений
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, HttpUrl, validator
+from pydantic import BaseModel, HttpUrl, field_validator
 
 
 class ListingBase(BaseModel):
@@ -40,14 +40,16 @@ class ListingCreate(ListingBase):
     source: str
     url: str
     
-    @validator('source')
+    @field_validator('source')
+    @classmethod
     def validate_source(cls, v):
         allowed_sources = ['idealista', 'immobiliare', 'subito']
         if v not in allowed_sources:
             raise ValueError(f'Источник должен быть одним из: {", ".join(allowed_sources)}')
         return v
     
-    @validator('property_type')
+    @field_validator('property_type')
+    @classmethod
     def validate_property_type(cls, v):
         if v is not None:
             allowed_types = ['apartment', 'house', 'room', 'studio']
@@ -111,13 +113,15 @@ class ListingSearch(BaseModel):
     page: int = 1
     limit: int = 50
     
-    @validator('page')
+    @field_validator('page')
+    @classmethod
     def validate_page(cls, v):
         if v < 1:
             raise ValueError('Номер страницы должен быть больше 0')
         return v
     
-    @validator('limit')
+    @field_validator('limit')
+    @classmethod
     def validate_limit(cls, v):
         if v < 1 or v > 100:
             raise ValueError('Лимит должен быть от 1 до 100')

@@ -2,7 +2,11 @@
 Pydantic схемы для авторизации
 """
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+try:
+    from pydantic import EmailStr
+except ImportError:
+    from pydantic.networks import EmailStr
 
 
 class Token(BaseModel):

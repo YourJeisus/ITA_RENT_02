@@ -3,7 +3,7 @@ Pydantic схемы для фильтров
 """
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class FilterBase(BaseModel):
@@ -26,7 +26,8 @@ class FilterBase(BaseModel):
 class FilterCreate(FilterBase):
     """Схема для создания фильтра"""
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if len(v.strip()) < 1:
             raise ValueError('Название фильтра не может быть пустым')
@@ -34,46 +35,29 @@ class FilterCreate(FilterBase):
             raise ValueError('Название фильтра не может быть длиннее 255 символов')
         return v.strip()
     
-    @validator('min_price', 'max_price')
+    @field_validator('min_price', 'max_price')
+    @classmethod
     def validate_price(cls, v):
         if v is not None and v < 0:
             raise ValueError('Цена не может быть отрицательной')
         return v
     
-    @validator('max_price')
-    def validate_price_range(cls, v, values):
-        if v is not None and 'min_price' in values and values['min_price'] is not None:
-            if v <= values['min_price']:
-                raise ValueError('Максимальная цена должна быть больше минимальной')
-        return v
-    
-    @validator('min_rooms', 'max_rooms')
+    @field_validator('min_rooms', 'max_rooms')
+    @classmethod
     def validate_rooms(cls, v):
         if v is not None and v < 0:
             raise ValueError('Количество комнат не может быть отрицательным')
         return v
     
-    @validator('max_rooms')
-    def validate_rooms_range(cls, v, values):
-        if v is not None and 'min_rooms' in values and values['min_rooms'] is not None:
-            if v < values['min_rooms']:
-                raise ValueError('Максимальное количество комнат должно быть больше или равно минимальному')
-        return v
-    
-    @validator('min_area', 'max_area')
+    @field_validator('min_area', 'max_area')
+    @classmethod
     def validate_area(cls, v):
         if v is not None and v < 0:
             raise ValueError('Площадь не может быть отрицательной')
         return v
     
-    @validator('max_area')
-    def validate_area_range(cls, v, values):
-        if v is not None and 'min_area' in values and values['min_area'] is not None:
-            if v <= values['min_area']:
-                raise ValueError('Максимальная площадь должна быть больше минимальной')
-        return v
-    
-    @validator('property_type')
+    @field_validator('property_type')
+    @classmethod
     def validate_property_type(cls, v):
         if v is not None:
             allowed_types = ['apartment', 'house', 'room', 'studio']
@@ -81,7 +65,8 @@ class FilterCreate(FilterBase):
                 raise ValueError(f'Тип недвижимости должен быть одним из: {", ".join(allowed_types)}')
         return v
     
-    @validator('notification_frequency_hours')
+    @field_validator('notification_frequency_hours')
+    @classmethod
     def validate_notification_frequency(cls, v):
         if v < 1:
             raise ValueError('Частота уведомлений должна быть минимум 1 час')
@@ -107,7 +92,8 @@ class FilterUpdate(BaseModel):
     notification_enabled: Optional[bool] = None
     notification_frequency_hours: Optional[int] = None
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if v is not None:
             if len(v.strip()) < 1:

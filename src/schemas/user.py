@@ -3,7 +3,11 @@ Pydantic схемы для пользователей
 """
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, field_validator
+try:
+    from pydantic import EmailStr
+except ImportError:
+    from pydantic.networks import EmailStr
 
 
 class UserBase(BaseModel):
@@ -17,7 +21,8 @@ class UserCreate(UserBase):
     """Схема для создания пользователя"""
     password: str
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Пароль должен содержать минимум 8 символов')
