@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, validator
+from sqlalchemy import text
 
 from src.api.deps import get_current_user, get_db
 from src.db.models import User
@@ -322,3 +323,37 @@ async def run_scraping_public(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при выполнении парсинга: {str(e)}"
         ) 
+
+
+@router.get("/test-db")
+async def test_database_connection(db: Session = Depends(get_db)):
+    """
+    Тестирование подключения к базе данных
+    """
+    try:
+        # Простой запрос для проверки БД
+        result = db.execute(text("SELECT 1 as test"))
+        test_value = result.scalar()
+        
+        # Проверяем количество таблиц
+        tables_result = db.execute(text("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """))
+        tables = [row[0] for row in tables_result.fetchall()]
+        
+        return {
+            "success": True,
+            "database_connection": "OK",
+            "test_query": test_value,
+            "tables_count": len(tables),
+            "tables": tables
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка подключения к БД: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "database_connection": "FAILED"
+        } 
