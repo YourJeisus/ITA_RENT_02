@@ -4,10 +4,7 @@ Pydantic схемы для пользователей
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, field_validator
-try:
-    from pydantic import EmailStr
-except ImportError:
-    from pydantic.networks import EmailStr
+from pydantic import EmailStr
 
 
 class UserBase(BaseModel):
