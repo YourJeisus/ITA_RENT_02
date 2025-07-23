@@ -156,6 +156,14 @@ class ScrapingService:
                     
             except Exception as e:
                 logger.error(f"❌ Ошибка сохранения объявления: {e}")
+                
+                # Детальное логирование для диагностики
+                if "value too long" in str(e):
+                    logger.error(f"🔍 Слишком длинное значение в объявлении {external_id}")
+                    for field, value in listing_data.items():
+                        if isinstance(value, str) and len(value) > 100:
+                            logger.error(f"   📏 Поле '{field}': {len(value)} символов (первые 100: {value[:100]}...)")
+                
                 logger.debug(f"Данные объявления: {listing_data}")
                 stats["errors"] += 1
                 continue
