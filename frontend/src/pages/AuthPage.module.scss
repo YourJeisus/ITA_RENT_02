@@ -1,4 +1,4 @@
-@use '@/styles/variables' as *;
+@use '../styles/variables' as *;
 
 .authPage {
   min-height: calc(100vh - 200px); // Учитываем высоту header и footer
