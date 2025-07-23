@@ -1,30 +1,40 @@
-# Dockerfile для production
-FROM node:20-alpine
+# Многоэтапная сборка для Railway
+FROM node:20-alpine as builder
 
-# Рабочая директория
 WORKDIR /app
 
-# Копирование package files
+# Копируем package files
 COPY package*.json ./
-
-# Установка всех зависимостей (включая dev для сборки)
 RUN npm ci
 
-# Копирование исходного кода
+# Копируем весь код
 COPY . .
 
-# Сборка проекта
+# Переменные окружения для сборки
+ENV VITE_API_URL=https://itarent02back-production.up.railway.app
+
+# Сборка приложения
 RUN npm run build
 
-# Удаление dev зависимостей для уменьшения размера
-RUN npm prune --production
+# Production stage
+FROM node:20-alpine
 
-# Переменные окружения для production
+WORKDIR /app
+
+# Копируем package.json для production зависимостей
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Копируем собранное приложение
+COPY --from=builder /app/dist ./dist
+COPY server.js ./
+
+# Переменные окружения
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Порт для Railway
+# Открываем порт
 EXPOSE 8080
 
-# Команда запуска production сервера
-CMD ["npm", "start"] 
+# Запуск production сервера
+CMD ["node", "server.js"] 
