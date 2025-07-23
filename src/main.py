@@ -27,16 +27,8 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS настройки
-origins = [
-    "http://localhost:3000",  # React frontend local
-    "http://localhost:3001",  # React frontend local (alt port)
-    "http://localhost:8000",  # FastAPI backend local
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001", 
-    "http://127.0.0.1:8000",
-    "https://itarent02front-production.up.railway.app",  # Production frontend
-]
+# CORS настройки - используем настройки из config
+origins = settings.BACKEND_CORS_ORIGINS.copy()
 
 # Добавляем дополнительные origins из переменных окружения
 cors_origins = os.getenv("BACKEND_CORS_ORIGINS")
@@ -45,8 +37,11 @@ if cors_origins:
         import json
         additional_origins = json.loads(cors_origins)
         origins.extend(additional_origins)
+        logger.info(f"Добавлены дополнительные CORS origins: {additional_origins}")
     except json.JSONDecodeError:
-        logger.warning("Неверный формат BACKEND_CORS_ORIGINS")
+        logger.warning("Неверный формат BACKEND_CORS_ORIGINS в переменных окружения")
+
+logger.info(f"CORS origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
