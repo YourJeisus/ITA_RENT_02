@@ -1,0 +1,28 @@
+# Railway Dockerfile для frontend (без nginx)
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Копирование package files
+COPY package*.json ./
+
+# Установка зависимостей
+RUN npm ci
+
+# Копирование исходного кода
+COPY . .
+
+# Сборка приложения
+RUN npm run build
+
+# Установка serve для раздачи статических файлов
+RUN npm install -g serve
+
+# Переменные окружения
+ENV NODE_ENV=production
+
+# Порт
+EXPOSE 3000
+
+# Команда запуска с serve
+CMD ["serve", "-s", "dist", "-l", "3000"] 

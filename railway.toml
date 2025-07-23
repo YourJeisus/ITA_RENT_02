@@ -1,0 +1,27 @@
+[[services]]
+name = "backend"
+source = "."
+build.builder = "dockerfile"
+build.dockerfilePath = "Dockerfile.prod"
+
+[services.backend.deploy]
+startCommand = "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+
+[services.backend.env]
+PYTHONPATH = "/app"
+ENVIRONMENT = "production"
+
+[[services]]
+name = "frontend"
+source = "frontend"
+build.builder = "dockerfile"
+build.dockerfilePath = "Dockerfile.railway"
+
+[services.frontend.deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+
+[services.frontend.env]
+NODE_ENV = "production" 

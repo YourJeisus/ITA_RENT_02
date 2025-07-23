@@ -1,0 +1,111 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import logging
+import os
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения
+load_dotenv()
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Создание FastAPI приложения
+app = FastAPI(
+    title=os.getenv("APP_NAME", "ITA_RENT_BOT"),
+    version=os.getenv("APP_VERSION", "1.0.0"),
+    description="Telegram бот для поиска недвижимости в Италии",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# CORS настройки
+origins = [
+    "http://localhost:3000",  # React frontend local
+    "http://localhost:3001",  # React frontend local (alt port)
+    "http://localhost:8000",  # FastAPI backend local
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001", 
+    "http://127.0.0.1:8000",
+
+]
+
+# Добавляем дополнительные origins из переменных окружения
+cors_origins = os.getenv("BACKEND_CORS_ORIGINS")
+if cors_origins:
+    try:
+        import json
+        additional_origins = json.loads(cors_origins)
+        origins.extend(additional_origins)
+    except json.JSONDecodeError:
+        logger.warning("Неверный формат BACKEND_CORS_ORIGINS")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.railway\.app",  # Railway domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """
+    Простой health check endpoint для проверки работоспособности API
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
+            "app_name": os.getenv("APP_NAME", "ITA_RENT_BOT"),
+            "version": os.getenv("APP_VERSION", "1.0.0"),
+            "environment": os.getenv("ENVIRONMENT", "development")
+        }
+    )
+
+# Корневой endpoint
+@app.get("/")
+async def root():
+    """
+    Корневой endpoint
+    """
+    return {
+        "message": "Welcome to ITA Rent Bot! Visit /docs for API documentation.",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+# Обработчик ошибок
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Endpoint не найден"}
+    )
+
+@app.exception_handler(500)
+async def internal_error_handler(request, exc):
+    logger.error(f"Внутренняя ошибка сервера: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Внутренняя ошибка сервера"}
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Запуск сервера
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True if os.getenv("DEBUG", "False").lower() == "true" else False,
+        log_level="info"
+    ) 

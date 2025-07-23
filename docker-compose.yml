@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  # Backend API
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - ENVIRONMENT=development
+      - DATABASE_URL=sqlite:///./ita_rent.db
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - app-network
+
+  # База данных PostgreSQL (для будущего использования)
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ita_rent_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  # Redis для кеширования (для будущего использования)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge

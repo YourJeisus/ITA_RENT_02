@@ -1,0 +1,281 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Инструкции для AI агента по разработке ITA_RENT_BOT
+
+## Git Workflow
+
+Создавай новую ветку для каждой логической единицы работы:
+
+- feature/auth-system
+- feature/basic-scraper
+- feature/telegram-bot
+- fix/database-connection
+- refactor/api-structure
+
+Делай коммиты часто, но осмысленно:
+
+- После завершения одной подзадачи (например, создание модели User)
+- После исправления бага
+- После рефакторинга одного файла/компонента
+- Перед переходом к новой функциональности
+
+Используй conventional commits:
+
+- feat: добавление новой функциональности
+- fix: исправление бага
+- refactor: рефакторинг без изменения функциональности
+- docs: обновление документации
+- test: добавление тестов
+- chore: обновление зависимостей, конфигурации
+
+Пушь в main только после:
+
+- Завершения всех подзадач этапа
+- Прохождения всех тестов
+- Проверки работоспособности в development окружении
+
+## Структура файлов
+
+Разбивай большие файлы на модули по принципу единственной ответственности:
+
+Вместо одного большого main.py:
+
+```
+src/
+├── main.py (только FastAPI app и startup)
+├── api/
+│   ├── deps.py (dependencies)
+│   └── endpoints/
+│       ├── auth.py
+│       ├── listings.py
+│       └── users.py
+├── core/
+│   ├── config.py
+│   ├── security.py
+│   └── schemas.py
+└── services/
+    ├── auth_service.py
+    └── scraper_service.py
+```
+
+Максимальный размер файла - 300 строк. При превышении разбивай на логические модули.
+
+Группируй связанные функции в отдельные файлы:
+
+- CRUD операции в crud/
+- Бизнес-логика в services/
+- Схемы данных в schemas/
+- Утилиты в utils/
+
+## Тестирование
+
+Пиши тесты сразу после реализации функциональности, не откладывай на потом.
+
+Создавай временные тестовые скрипты в папке temp/:
+
+```
+temp/
+├── test_database_connection.py
+├── test_scraper_manual.py
+└── test_telegram_webhook.py
+```
+
+Удаляй временные скрипты после успешной интеграции функции в основной код.
+
+Структура тестов:
+
+```
+tests/
+├── unit/
+│   ├── test_auth.py
+│   ├── test_crud.py
+│   └── test_parsers.py
+├── integration/
+│   ├── test_api.py
+│   └── test_database.py
+└── conftest.py
+```
+
+Покрывай тестами:
+
+- Все CRUD операции
+- API endpoints
+- Критическую бизнес-логику
+- Парсеры и внешние интеграции
+
+## Итеративная разработка
+
+Реализуй минимальную работающую версию функции, затем улучшай:
+
+1. Базовая версия - работает, но просто
+2. Добавление валидации и обработки ошибок
+3. Оптимизация производительности
+4. Расширение функциональности
+
+Пример для парсера:
+
+1. Парсит одну страницу, сохраняет в БД
+2. Добавляет обработку ошибок HTTP
+3. Добавляет пагинацию
+4. Добавляет асинхронность
+
+## Масштабируемость
+
+Проектируй код с учетом будущего роста:
+
+Используй dependency injection для сервисов:
+
+```python
+def get_scraper_service(db: Session = Depends(get_db)):
+    return ScraperService(db)
+```
+
+Выноси конфигурацию в переменные окружения:
+
+```python
+SCRAPER_DELAY = int(os.getenv("SCRAPER_DELAY", "5"))
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "10"))
+```
+
+Создавай абстракции для внешних сервисов:
+
+```python
+class NotificationSender(ABC):
+    @abstractmethod
+    def send(self, message: str, recipient: str):
+        pass
+
+class TelegramSender(NotificationSender):
+    def send(self, message: str, recipient: str):
+        # Telegram specific implementation
+        pass
+```
+
+## Обработка ошибок
+
+Создавай кастомные исключения для разных типов ошибок:
+
+```python
+class ScrapingError(Exception):
+    pass
+
+class DatabaseError(Exception):
+    pass
+
+class AuthenticationError(Exception):
+    pass
+```
+
+Логируй все важные события и ошибки:
+
+```python
+logger.info(f"Started scraping for user {user_id}")
+logger.error(f"Failed to parse listing {listing_id}: {str(e)}")
+```
+
+## Документация кода
+
+Пиши docstrings для всех публичных функций и классов:
+
+```python
+def create_user(db: Session, user_data: UserCreate) -> User:
+    """
+    Create a new user in the database.
+
+    Args:
+        db: Database session
+        user_data: User creation data
+
+    Returns:
+        Created user object
+
+    Raises:
+        DatabaseError: If user creation fails
+    """
+```
+
+Обновляй README.md при добавлении новых компонентов или изменении API.
+
+## Производительность
+
+Используй асинхронные операции для I/O:
+
+- HTTP requests (aiohttp)
+- Database operations (asyncpg)
+- File operations (aiofiles)
+
+Добавляй индексы в базу данных для часто используемых полей:
+
+```python
+# В модели
+__table_args__ = (
+    Index('idx_listing_city_price', 'city', 'price'),
+    Index('idx_user_email', 'email'),
+)
+```
+
+Кешируй результаты дорогих операций:
+
+```python
+@lru_cache(maxsize=100)
+def get_cities_list():
+    return db.query(City).all()
+```
+
+## Безопасность
+
+Валидируй все входящие данные с помощью Pydantic:
+
+```python
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+```
+
+Никогда не логируй пароли, токены или другие секретные данные.
+
+Используй environment variables для всех секретов:
+
+```python
+JWT_SECRET = os.getenv("JWT_SECRET")
+DATABASE_URL = os.getenv("DATABASE_URL")
+```
+
+## Деплой
+
+Проверяй работоспособность локально перед каждым деплоем:
+
+1. Запускай все тесты
+2. Проверяй основные пользовательские сценарии
+3. Проверяй логи на отсутствие ошибок
+
+Используй feature flags для новой функциональности:
+
+```python
+ENABLE_NEW_PARSER = os.getenv("ENABLE_NEW_PARSER", "false").lower() == "true"
+```
+
+Мониторь приложение после деплоя:
+
+- Проверяй логи на ошибки
+- Мониторь использование ресурсов
+- Проверяй ключевые метрики (время ответа API, успешность парсинга)
+
+## Приоритеты разработки
+
+1. Функциональность - код должен работать
+2. Читаемость - код должен быть понятен
+3. Тестируемость - код должен быть покрыт тестами
+4. Производительность - оптимизируй только после измерения
+
+Следуй принципу YAGNI (You Aren't Gonna Need It) - не добавляй функциональность "на будущее".
+
+Рефактори код когда:
+
+- Файл превышает 300 строк
+- Функция превышает 50 строк
+- Код дублируется в нескольких местах
+- Добавление новой функции требует изменения многих файлов
