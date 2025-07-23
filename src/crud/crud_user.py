@@ -107,4 +107,21 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
 
 # Создаем экземпляр CRUD для использования
-user = CRUDUser(User) 
+user = CRUDUser(User)
+
+# Функции-обертки для совместимости с API
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    """Получить пользователя по email"""
+    return user.get_by_email(db, email=email)
+
+def create_user(db: Session, **kwargs) -> User:
+    """Создать пользователя"""
+    db_obj = User(**kwargs)
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+    """Аутентификация пользователя"""
+    return user.authenticate(db, email=email, password=password) 

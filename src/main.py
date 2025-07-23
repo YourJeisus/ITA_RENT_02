@@ -5,6 +5,9 @@ import logging
 import os
 from dotenv import load_dotenv
 
+from src.api.v1.api import api_router
+from src.core.config import settings
+
 # Загружаем переменные окружения
 load_dotenv()
 
@@ -17,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Создание FastAPI приложения
 app = FastAPI(
-    title=os.getenv("APP_NAME", "ITA_RENT_BOT"),
-    version=os.getenv("APP_VERSION", "1.0.0"),
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
     description="Telegram бот для поиска недвижимости в Италии",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -54,6 +57,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Подключаем API роутеры
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -64,9 +70,9 @@ async def health_check():
         status_code=200,
         content={
             "status": "ok",
-            "app_name": os.getenv("APP_NAME", "ITA_RENT_BOT"),
-            "version": os.getenv("APP_VERSION", "1.0.0"),
-            "environment": os.getenv("ENVIRONMENT", "development")
+            "app_name": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "environment": settings.ENVIRONMENT
         }
     )
 

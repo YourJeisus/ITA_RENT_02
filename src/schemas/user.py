@@ -53,6 +53,21 @@ class User(UserInDBBase):
     pass
 
 
+class UserResponse(BaseModel):
+    """Схема ответа с информацией о пользователе"""
+    id: int
+    email: EmailStr
+    first_name: str
+    last_name: Optional[str] = None
+    subscription_type: str
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
 class UserInDB(UserInDBBase):
     """Схема пользователя в БД с хешированным паролем"""
     hashed_password: str
