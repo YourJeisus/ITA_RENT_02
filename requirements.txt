@@ -18,6 +18,9 @@ pydantic-settings==2.1.0
 
 # HTTP клиент для парсинга и тестирования
 httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+aiohttp==3.9.1
 beautifulsoup4==4.12.2
 
 # Telegram бот

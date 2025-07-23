@@ -1,0 +1,16 @@
+@use '@/styles/variables' as *;
+
+.filtersPage {
+  padding-top: $padding-xl;
+  padding-bottom: $padding-xl;
+  min-height: calc(100vh - 200px);
+}
+
+.filterCard {
+  height: 100%;
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}

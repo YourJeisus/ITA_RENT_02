@@ -1,0 +1,218 @@
+@use '@/styles/variables' as *;
+
+.heroFiltersContainer {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: $padding-xl * 2 $padding-lg;
+  border-radius: $border-radius-lg;
+  margin: $padding-xl auto;
+  max-width: 1200px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.title {
+  color: white;
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: $padding-sm;
+  font-weight: 700;
+
+  @media (max-width: 768px) {
+    font-size: 2rem;
+  }
+}
+
+.subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  font-size: 1.1rem;
+  margin-bottom: $padding-xl;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $padding-md;
+  align-items: end;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+
+  &.priceRange {
+    grid-column: span 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: $padding-sm;
+
+    @media (max-width: 768px) {
+      grid-column: span 1;
+    }
+  }
+
+  &.locationInput {
+    grid-column: span 2;
+
+    @media (max-width: 768px) {
+      grid-column: span 1;
+    }
+  }
+}
+
+.select,
+.input {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: $border-radius-md;
+  padding: $padding-sm $padding-md;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  height: 48px;
+
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  &::placeholder {
+    color: #999;
+  }
+}
+
+.select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 20px;
+  padding-right: 40px;
+}
+
+.priceSeparator {
+  color: white;
+  font-weight: 500;
+  margin: 0 $padding-xs;
+}
+
+.buttonGroup {
+  grid-column: span 2;
+  display: flex;
+  gap: $padding-md;
+
+  @media (max-width: 768px) {
+    grid-column: span 1;
+    flex-direction: column;
+  }
+}
+
+.submitButton {
+  flex: 2;
+  background: white;
+  color: #667eea;
+  border: none;
+  border-radius: $border-radius-md;
+  padding: $padding-md $padding-xl;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 56px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.subscribeButton {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: $border-radius-md;
+  padding: $padding-md $padding-lg;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 56px;
+  backdrop-filter: blur(10px);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.subscriptionPromo {
+  margin-top: $padding-xl;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: $border-radius-lg;
+  padding: $padding-lg;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.promoContent {
+  display: flex;
+  align-items: center;
+  gap: $padding-lg;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    text-align: center;
+    gap: $padding-md;
+  }
+}
+
+.promoIcon {
+  font-size: 3rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+
+  @media (max-width: 768px) {
+    font-size: 2.5rem;
+  }
+}
+
+.promoText {
+  flex: 1;
+  color: white;
+
+  h3 {
+    margin: 0 0 $padding-xs 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+
+    @media (max-width: 768px) {
+      font-size: 1.2rem;
+    }
+  }
+
+  p {
+    margin: 0;
+    font-size: 1rem;
+    opacity: 0.9;
+    line-height: 1.5;
+
+    @media (max-width: 768px) {
+      font-size: 0.9rem;
+    }
+  }
+}

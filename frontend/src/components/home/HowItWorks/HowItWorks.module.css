@@ -1,0 +1,48 @@
+.howItWorks {
+  padding: 6rem 2rem;
+  background-color: #ffffff;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 3rem;
+  color: #1a1a1a;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.message {
+  padding: 1rem 1.5rem;
+  border-radius: 20px;
+  max-width: 75%;
+  line-height: 1.6;
+}
+
+.message p {
+  margin: 0;
+}
+
+.you {
+  background-color: #f0f0f0; /* Светлый фон для сообщения пользователя */
+  color: #1a1a1a;
+  border-bottom-left-radius: 5px;
+  align-self: flex-start;
+}
+
+.bot {
+  background-color: #8a2be2; /* Фирменный фиолетовый для бота */
+  color: #ffffff;
+  border-bottom-right-radius: 5px;
+  align-self: flex-end;
+} 

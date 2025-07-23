@@ -222,6 +222,166 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
                 db.refresh(obj)
         
         return db_objs
+    
+    def search_with_filters(
+        self,
+        db: Session,
+        *,
+        filters: Dict[str, Any],
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Listing]:
+        """Поиск объявлений с фильтрами (новая версия)"""
+        query = db.query(Listing).filter(Listing.is_active == True)
+        
+        # Применяем фильтры
+        if "city" in filters and filters["city"]:
+            query = query.filter(Listing.city.ilike(f"%{filters['city']}%"))
+        
+        if "min_price" in filters and filters["min_price"] is not None:
+            query = query.filter(Listing.price >= filters["min_price"])
+        
+        if "max_price" in filters and filters["max_price"] is not None:
+            query = query.filter(Listing.price <= filters["max_price"])
+        
+        if "property_type" in filters and filters["property_type"]:
+            query = query.filter(Listing.property_type == filters["property_type"])
+        
+        if "min_rooms" in filters and filters["min_rooms"] is not None:
+            query = query.filter(Listing.rooms >= filters["min_rooms"])
+        
+        if "max_rooms" in filters and filters["max_rooms"] is not None:
+            query = query.filter(Listing.rooms <= filters["max_rooms"])
+        
+        if "min_area" in filters and filters["min_area"] is not None:
+            query = query.filter(Listing.area >= filters["min_area"])
+        
+        if "max_area" in filters and filters["max_area"] is not None:
+            query = query.filter(Listing.area <= filters["max_area"])
+        
+        if "source_site" in filters and filters["source_site"]:
+            query = query.filter(Listing.source == filters["source_site"])
+        
+        # Сортировка по дате добавления (новые первыми)
+        query = query.order_by(desc(Listing.scraped_at))
+        
+        return query.offset(skip).limit(limit).all()
+    
+    def count_with_filters(
+        self,
+        db: Session,
+        *,
+        filters: Dict[str, Any]
+    ) -> int:
+        """Подсчет объявлений с фильтрами"""
+        query = db.query(Listing).filter(Listing.is_active == True)
+        
+        # Применяем те же фильтры что и в search_with_filters
+        if "city" in filters and filters["city"]:
+            query = query.filter(Listing.city.ilike(f"%{filters['city']}%"))
+        
+        if "min_price" in filters and filters["min_price"] is not None:
+            query = query.filter(Listing.price >= filters["min_price"])
+        
+        if "max_price" in filters and filters["max_price"] is not None:
+            query = query.filter(Listing.price <= filters["max_price"])
+        
+        if "property_type" in filters and filters["property_type"]:
+            query = query.filter(Listing.property_type == filters["property_type"])
+        
+        if "min_rooms" in filters and filters["min_rooms"] is not None:
+            query = query.filter(Listing.rooms >= filters["min_rooms"])
+        
+        if "max_rooms" in filters and filters["max_rooms"] is not None:
+            query = query.filter(Listing.rooms <= filters["max_rooms"])
+        
+        if "min_area" in filters and filters["min_area"] is not None:
+            query = query.filter(Listing.area >= filters["min_area"])
+        
+        if "max_area" in filters and filters["max_area"] is not None:
+            query = query.filter(Listing.area <= filters["max_area"])
+        
+        if "source_site" in filters and filters["source_site"]:
+            query = query.filter(Listing.source == filters["source_site"])
+        
+        return query.count()
+    
+    def get_available_cities(self, db: Session) -> List[str]:
+        """Получить список доступных городов"""
+        result = db.query(Listing.city).filter(
+            and_(
+                Listing.city.isnot(None),
+                Listing.is_active == True
+            )
+        ).distinct().order_by(Listing.city).all()
+        return [city[0] for city in result if city[0]]
+    
+    def get_database_stats(self, db: Session) -> Dict[str, Any]:
+        """Получить подробную статистику базы данных"""
+        total = db.query(Listing).count()
+        active = db.query(Listing).filter(Listing.is_active == True).count()
+        inactive = total - active
+        
+        # Статистика по источникам
+        by_source = db.query(
+            Listing.source,
+            func.count(Listing.id).label('count')
+        ).filter(Listing.is_active == True).group_by(Listing.source).all()
+        
+        # Топ городов
+        by_city = db.query(
+            Listing.city,
+            func.count(Listing.id).label('count')
+        ).filter(
+            and_(
+                Listing.is_active == True,
+                Listing.city.isnot(None)
+            )
+        ).group_by(Listing.city).order_by(desc('count')).limit(10).all()
+        
+        # Средняя цена
+        avg_price_result = db.query(
+            func.avg(Listing.price).label('avg_price')
+        ).filter(
+            and_(
+                Listing.is_active == True,
+                Listing.price.isnot(None)
+            )
+        ).first()
+        
+        # Диапазон дат
+        date_range = db.query(
+            func.min(Listing.scraped_at).label('oldest'),
+            func.max(Listing.scraped_at).label('newest')
+        ).filter(Listing.is_active == True).first()
+        
+        # Свежие объявления за 24 часа
+        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        recent_24h = db.query(Listing).filter(
+            and_(
+                Listing.is_active == True,
+                Listing.scraped_at >= cutoff_time
+            )
+        ).count()
+        
+        return {
+            "total_listings": total,
+            "active_listings": active,
+            "inactive_listings": inactive,
+            "sites": {source: count for source, count in by_source},
+            "top_cities": {city: count for city, count in by_city},
+            "average_price": float(avg_price_result.avg_price) if avg_price_result.avg_price else 0,
+            "date_range": {
+                "oldest": date_range.oldest.isoformat() if date_range.oldest else None,
+                "newest": date_range.newest.isoformat() if date_range.newest else None
+            },
+            "recent_listings_24h": recent_24h,
+            "data_freshness": {
+                "total_active": active,
+                "recent_24h": recent_24h,
+                "freshness_ratio": round(recent_24h / active * 100, 2) if active > 0 else 0
+            }
+        }
 
 
 # Создаем экземпляр CRUD для использования

@@ -1,0 +1,64 @@
+.hero {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 8rem 2rem;
+  background-color: #1a1a1a; /* Темный фон, как на референсе */
+  color: #ffffff;
+  min-height: 60vh;
+}
+
+.content {
+  max-width: 800px;
+}
+
+.title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  margin-bottom: 2.5rem;
+  color: #d1d1d1; /* Слегка приглушенный текст */
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.button {
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.primary {
+  background-color: #8a2be2; /* Фиолетовый акцент, как на референсе */
+  color: #ffffff;
+}
+
+.primary:hover {
+  background-color: #7b24c6;
+}
+
+.secondary {
+  background-color: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.secondary:hover {
+  background-color: #ffffff;
+  color: #1a1a1a;
+} 

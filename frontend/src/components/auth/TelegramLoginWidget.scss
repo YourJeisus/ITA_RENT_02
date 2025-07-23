@@ -1,0 +1,95 @@
+.telegram-login-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: #0088cc;
+    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.15);
+  }
+
+  .telegram-widget-container {
+    display: flex;
+    justify-content: center;
+    min-height: 40px;
+
+    // Стили для самого Telegram виджета
+    iframe {
+      border-radius: 8px !important;
+      transition: transform 0.2s ease;
+
+      &:hover {
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  .telegram-login-description {
+    margin: 0;
+    font-size: 14px;
+    color: #657786;
+    text-align: center;
+    line-height: 1.4;
+    max-width: 280px;
+  }
+
+  // Адаптивность
+  @media (max-width: 768px) {
+    padding: 16px;
+
+    .telegram-login-description {
+      font-size: 12px;
+    }
+  }
+
+  // Темная тема
+  @media (prefers-color-scheme: dark) {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    border-color: #333;
+
+    .telegram-login-description {
+      color: #aab8c2;
+    }
+
+    &:hover {
+      border-color: #0088cc;
+      box-shadow: 0 4px 12px rgba(0, 136, 204, 0.25);
+    }
+  }
+
+  // Состояния загрузки
+  &.loading {
+    .telegram-widget-container {
+      position: relative;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        border: 2px solid #e1e8ed;
+        border-top: 2px solid #0088cc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+    }
+  }
+
+  @keyframes spin {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg);
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+}

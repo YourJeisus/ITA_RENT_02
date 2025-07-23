@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = ""
     
     # Парсинг
-    SCRAPER_API_KEY: str = ""
+    SCRAPERAPI_KEY: str = ""
+    SCRAPER_API_KEY: str = ""  # Для обратной совместимости 
     USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     
     # Мониторинг
