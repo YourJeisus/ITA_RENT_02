@@ -24,4 +24,5 @@ healthcheckPath = "/"
 healthcheckTimeout = 300
 
 [services.frontend.env]
-NODE_ENV = "production" 
+NODE_ENV = "production"
+VITE_API_URL = "http://ita_rent_02.railway.internal" 

@@ -21,8 +21,8 @@ RUN npm install -g serve
 # Переменные окружения
 ENV NODE_ENV=production
 
-# Порт
-EXPOSE 3000
+# Порт (Railway использует переменную PORT)
+EXPOSE $PORT
 
-# Команда запуска с serve
-CMD ["serve", "-s", "dist", "-l", "3000"] 
+# Команда запуска с serve на динамическом порту
+CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"] 
