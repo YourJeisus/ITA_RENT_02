@@ -157,6 +157,13 @@ class ScrapingService:
             except Exception as e:
                 logger.error(f"❌ Ошибка сохранения объявления: {e}")
                 
+                # Принудительный rollback сессии при ошибках
+                try:
+                    db.rollback()
+                    logger.debug("🔄 Сессия БД откатана")
+                except Exception as rollback_error:
+                    logger.error(f"❌ Ошибка rollback: {rollback_error}")
+                
                 # Детальное логирование для диагностики
                 if "value too long" in str(e):
                     logger.error(f"🔍 Слишком длинное значение в объявлении {external_id}")
