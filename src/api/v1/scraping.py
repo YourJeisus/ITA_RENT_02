@@ -278,3 +278,50 @@ async def get_scraping_status():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при получении статуса системы"
         ) 
+
+
+@router.post("/run-public", response_model=ScrapingResponse)
+async def run_scraping_public(
+    city: str = "Roma",
+    max_pages: int = 10,
+    db: Session = Depends(get_db)
+):
+    """
+    ВРЕМЕННЫЙ публичный endpoint для запуска парсинга без авторизации
+    Только для тестирования и первичного заполнения БД
+    """
+    try:
+        logger.info(f"Публичный запуск парсинга для города {city}, страниц: {max_pages}")
+        
+        # Базовые фильтры для Рима
+        filters = {
+            "city": city,
+            "min_price": 500,
+            "max_price": 3000,
+            "property_type": "apartment"
+        }
+        
+        # Запускаем парсинг
+        stats = scraping_service.scrape_and_save(
+            filters=filters,
+            db=db,
+            sources=None,  # все источники
+            max_pages=max_pages,
+            use_scraperapi=True,
+            update_existing=True
+        )
+        
+        logger.info(f"Публичный парсинг завершен: {stats}")
+        
+        return ScrapingResponse(
+            success=True,
+            message=f"Парсинг завершен успешно. Обработано {stats['total_scraped']} объявлений.",
+            stats=stats
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при публичном парсинге: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при выполнении парсинга: {str(e)}"
+        ) 
