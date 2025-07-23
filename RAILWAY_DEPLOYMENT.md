@@ -44,7 +44,7 @@ ITA_RENT_02/
 
    - Нажмите "New Project"
    - Выберите "Deploy from GitHub repo"
-   - Найдите и выберите ваш репозиторий `ITA_RENT_02`
+   - Найдите и выберите ваш репозиторий `YourJeisus/ITA_RENT_02`
 
 3. **Railway автоматически обнаружит конфигурацию:**
    - Railway прочитает `railway.toml`

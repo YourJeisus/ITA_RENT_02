@@ -26,7 +26,7 @@ git push -u origin main
 1. Зайдите на [railway.app](https://railway.app)
 2. **Login** через GitHub
 3. **New Project** → **Deploy from GitHub repo**
-4. Выберите репозиторий `ita_rent_02`
+4. Выберите репозиторий `YourJeisus/ITA_RENT_02`
 
 ### Шаг 3: Railway автоматически создаст
 
