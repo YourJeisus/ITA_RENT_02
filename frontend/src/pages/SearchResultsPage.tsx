@@ -45,7 +45,7 @@ const SearchResultsPage: React.FC = () => {
         name: filtersFromUrl.city || "Рим",
       },
       transactionType: "rent",
-      propertyType: filtersFromUrl.property_type || "all",
+      propertyType: filtersFromUrl.property_type || undefined, // Не устанавливаем "all"
       rooms: filtersFromUrl.rooms ? filtersFromUrl.rooms.map(Number) : null,
       priceMin: filtersFromUrl.price_min
         ? Number(filtersFromUrl.price_min)
