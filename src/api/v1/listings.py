@@ -125,7 +125,7 @@ async def search_listings(
                     "features": [],  # TODO: добавить поддержку features
                     "photos_urls": l.images if l.images else [],
                     "published_at": l.scraped_at.isoformat() if l.scraped_at else None,
-                    "created_at": l.created_at.isoformat(),
+                    "created_at": l.created_at.isoformat() if l.created_at else None,
                     "last_seen_at": l.updated_at.isoformat() if l.updated_at else None,
                     "is_available": l.is_active
                 }
@@ -177,7 +177,7 @@ async def get_listing(
         "features": [],
         "photos_urls": listing_obj.images if listing_obj.images else [],
         "published_at": listing_obj.scraped_at.isoformat() if listing_obj.scraped_at else None,
-        "created_at": listing_obj.created_at.isoformat(),
+        "created_at": listing_obj.created_at.isoformat() if listing_obj.created_at else None,
         "last_seen_at": listing_obj.updated_at.isoformat() if listing_obj.updated_at else None,
         "is_available": listing_obj.is_active
     }

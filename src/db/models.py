@@ -48,7 +48,7 @@ class User(Base):
     )
     
     # Временные метки
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
@@ -191,6 +191,9 @@ class Listing(Base):
     # Статус и временные метки
     is_active: Mapped[bool] = mapped_column(default=True, index=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
     scraped_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
