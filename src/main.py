@@ -66,7 +66,7 @@ logger.info(f"CORS origins: {origins}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"https://.*\.railway\.app",  # Railway domains
+    allow_origin_regex=r"https://.*\.(railway|vercel)\.app",  # Railway and Vercel domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

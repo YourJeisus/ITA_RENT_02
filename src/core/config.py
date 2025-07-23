@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     
-    # CORS - обновленные домены Railway
+    # CORS - обновленные домены Railway + Vercel
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
@@ -83,6 +83,10 @@ class Settings(BaseSettings):
         # Railway production URLs (обновленные)
         "https://itarent02front-production.up.railway.app",
         "https://itarent02back-production.up.railway.app",
+        # Vercel domains
+        "https://ita-rent-02.vercel.app",
+        "https://ita-rent-02-*.vercel.app",
+        "https://*.vercel.app",
         # Возможные новые домены Railway
         "https://*.railway.app",
         "https://*.up.railway.app"
