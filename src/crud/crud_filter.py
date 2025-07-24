@@ -217,4 +217,32 @@ class CRUDFilter(CRUDBase[Filter, FilterCreate, FilterUpdate]):
 
 
 # Создаем экземпляр CRUD для использования
-filter = CRUDFilter(Filter) 
+filter = CRUDFilter(Filter)
+
+# Функции-обертки для совместимости с API
+def get_user_filters(db: Session, user_id: int) -> List[Filter]:
+    """Получить все фильтры пользователя"""
+    return filter.get_user_filters(db, user_id=user_id)
+
+def get_filter_by_id(db: Session, filter_id: int) -> Optional[Filter]:
+    """Получить фильтр по ID"""
+    return filter.get(db, id=filter_id)
+
+def create_filter(db: Session, filter_data: dict, user_id: int) -> Filter:
+    """Создать новый фильтр"""
+    return filter.create_with_owner(db, obj_in=filter_data, user_id=user_id)
+
+def update_filter(db: Session, filter_id: int, filter_data: dict) -> Optional[Filter]:
+    """Обновить фильтр"""
+    filter_obj = filter.get(db, id=filter_id)
+    if filter_obj:
+        return filter.update(db, db_obj=filter_obj, obj_in=filter_data)
+    return None
+
+def delete_filter(db: Session, filter_id: int) -> bool:
+    """Удалить фильтр"""
+    filter_obj = filter.get(db, id=filter_id)
+    if filter_obj:
+        filter.remove(db, id=filter_id)
+        return True
+    return False 

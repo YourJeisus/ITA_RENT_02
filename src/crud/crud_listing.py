@@ -385,4 +385,41 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
 
 
 # Создаем экземпляр CRUD для использования
-listing = CRUDListing(Listing) 
+listing = CRUDListing(Listing)
+
+# Функции-обертки для совместимости с API
+def search_listings(db: Session, **filters) -> Dict[str, Any]:
+    """Поиск объявлений с фильтрами"""
+    # Получаем основные параметры
+    page = filters.pop('page', 1)
+    limit = filters.pop('limit', 50)
+    
+    # Выполняем поиск
+    results = listing.search(db, page=page, limit=limit, **filters)
+    
+    return {
+        "listings": results["listings"],
+        "total": results["total"],
+        "page": page,
+        "limit": limit,
+        "total_pages": (results["total"] + limit - 1) // limit
+    }
+
+def get_listing_by_id(db: Session, listing_id: int) -> Optional[Listing]:
+    """Получить объявление по ID"""
+    return listing.get(db, id=listing_id)
+
+def create_listing(db: Session, listing_data: dict) -> Listing:
+    """Создать новое объявление"""
+    return listing.create(db, obj_in=listing_data)
+
+def update_listing(db: Session, listing_id: int, listing_data: dict) -> Optional[Listing]:
+    """Обновить объявление"""
+    listing_obj = listing.get(db, id=listing_id)
+    if listing_obj:
+        return listing.update(db, db_obj=listing_obj, obj_in=listing_data)
+    return None
+
+def get_database_stats(db: Session) -> Dict[str, Any]:
+    """Получить статистику базы данных"""
+    return listing.get_database_stats(db) 

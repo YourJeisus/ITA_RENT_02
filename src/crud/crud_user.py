@@ -82,6 +82,17 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db.refresh(user)
         return user
     
+    def unlink_telegram(self, db: Session, *, user_id: int) -> User:
+        """Отвязать Telegram от аккаунта пользователя"""
+        user = self.get(db, id=user_id)
+        if user:
+            user.telegram_chat_id = None
+            user.telegram_username = None
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    
     def update_subscription(self, db: Session, *, user_id: int, subscription_type: str, expires_at=None) -> User:
         """Обновить подписку пользователя"""
         user = self.get(db, id=user_id)
@@ -113,6 +124,18 @@ user = CRUDUser(User)
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Получить пользователя по email"""
     return user.get_by_email(db, email=email)
+
+def get_by_telegram_chat_id(db: Session, telegram_chat_id: str) -> Optional[User]:
+    """Получить пользователя по Telegram chat ID"""
+    return user.get_by_telegram_chat_id(db, telegram_chat_id=telegram_chat_id)
+
+def link_telegram(db: Session, user_id: int, telegram_chat_id: str, telegram_username: str = None) -> User:
+    """Привязать Telegram к аккаунту пользователя"""
+    return user.link_telegram(db, user_id=user_id, telegram_chat_id=telegram_chat_id, telegram_username=telegram_username)
+
+def unlink_telegram(db: Session, user_id: int) -> User:
+    """Отвязать Telegram от аккаунта пользователя"""
+    return user.unlink_telegram(db, user_id=user_id)
 
 def create_user(db: Session, **kwargs) -> User:
     """Создать пользователя"""

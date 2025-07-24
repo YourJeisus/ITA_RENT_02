@@ -44,13 +44,45 @@ PYTHONPATH = "/app"
 ENVIRONMENT = "production"
 WORKER_TYPE = "scraper"
 
-# PostgreSQL база данных
+# Telegram бот сервис
 [[services]]
-name = "postgres"
-source = ""
+name = "telegram-bot"
+source = "."
 build.builder = "dockerfile"
+build.dockerfilePath = "Dockerfile.prod"
+build.buildCommand = "echo 'Telegram bot service'"
 
-[services.postgres.deploy]
+[services.telegram-bot.deploy]
+startCommand = "python run_telegram_bot.py"
 healthcheckPath = ""
 healthcheckTimeout = 300
-restartPolicyType = "always" 
+restartPolicyType = "always"
+
+[services.telegram-bot.env]
+PYTHONPATH = "/app"
+ENVIRONMENT = "production"
+SERVICE_TYPE = "telegram-bot"
+
+# Диспетчер уведомлений (cron)
+[[services]]
+name = "notification-worker"
+source = "."
+build.builder = "dockerfile"
+build.dockerfilePath = "Dockerfile.prod"
+build.buildCommand = "echo 'Notification worker service'"
+
+[services.notification-worker.deploy]
+startCommand = "while true; do python cron_notifications.py; sleep 1800; done"
+healthcheckPath = ""
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+[services.notification-worker.env]
+PYTHONPATH = "/app"
+ENVIRONMENT = "production"
+SERVICE_TYPE = "notification-worker"
+
+# PostgreSQL база данных (создается автоматически в Railway)
+# [[services]]
+# name = "postgres"
+# ... 
