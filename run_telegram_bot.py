@@ -1,64 +1,117 @@
 #!/usr/bin/env python3
 """
 Скрипт запуска Telegram бота для ITA_RENT_BOT
-MVP версия
 """
-import asyncio
 import os
 import sys
+import asyncio
 import logging
-from dotenv import load_dotenv
+from pathlib import Path
 
-# Добавляем корневую папку в Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from src.services.telegram_bot import TelegramBotService
-
-# Загружаем переменные окружения
-load_dotenv()
+# Добавляем корневую папку в путь
+sys.path.append(str(Path(__file__).parent))
 
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('telegram_bot.log') if os.path.exists('/') else logging.NullHandler()
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
 logger = logging.getLogger(__name__)
 
+def load_environment():
+    """Загрузка переменных окружения"""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        logger.info("✅ Переменные окружения загружены")
+    except ImportError:
+        logger.info("📝 python-dotenv не установлен, используем системные переменные")
+
+def check_required_env_vars():
+    """Проверка обязательных переменных окружения"""
+    required_vars = {
+        "TELEGRAM_BOT_TOKEN": "Токен Telegram бота",
+        "DATABASE_URL": "URL базы данных",
+        "SECRET_KEY": "Секретный ключ"
+    }
+    
+    missing_vars = []
+    for var, description in required_vars.items():
+        if not os.getenv(var):
+            missing_vars.append(f"{var} ({description})")
+    
+    if missing_vars:
+        logger.error("❌ Отсутствуют обязательные переменные окружения:")
+        for var in missing_vars:
+            logger.error(f"   - {var}")
+        return False
+    
+    logger.info("✅ Все обязательные переменные окружения установлены")
+    return True
+
+async def check_database_connection():
+    """Проверка подключения к базе данных с ретраями"""
+    max_retries = 10
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            from src.db.database import get_db
+            from src.db.models import User
+            
+            # Получаем сессию БД
+            db = next(get_db())
+            
+            # Пробуем выполнить простой запрос
+            count = db.query(User).count()
+            logger.info(f"✅ База данных доступна. Пользователей: {count}")
+            db.close()
+            return True
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Попытка {attempt + 1}/{max_retries} подключения к БД неуспешна: {e}")
+            
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Ожидание {retry_delay} секунд перед повторной попыткой...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error("❌ Не удалось подключиться к базе данных")
+                return False
+    
+    return False
 
 async def main():
-    """Главная функция запуска бота"""
+    """Главная функция"""
     logger.info("🤖 Запуск ITA_RENT_BOT Telegram Bot...")
     
-    # Проверяем наличие токена
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        logger.error("❌ TELEGRAM_BOT_TOKEN не установлен!")
-        logger.error("Создайте .env файл и добавьте:")
-        logger.error("TELEGRAM_BOT_TOKEN=your_bot_token_here")
+    # Загружаем переменные окружения
+    load_environment()
+    
+    # Проверяем переменные окружения
+    if not check_required_env_vars():
         sys.exit(1)
     
-    # Создаем и запускаем бота
+    # Проверяем подключение к базе данных
+    logger.info("🔍 Проверка подключения к базе данных...")
+    if not await check_database_connection():
+        logger.error("❌ Критическая ошибка: Нет подключения к базе данных")
+        sys.exit(1)
+    
+    # Запускаем Telegram бота
     try:
-        bot = TelegramBotService()
+        from src.services.telegram_bot import TelegramBotService
+        
+        bot_service = TelegramBotService()
         logger.info("✅ Бот инициализирован успешно")
         
-        # Запускаем в polling режиме
-        await bot.start_polling()
+        # Запуск в режиме polling
+        await bot_service.start_polling()
         
     except KeyboardInterrupt:
-        logger.info("⏹️  Бот остановлен пользователем")
-        
+        logger.info("🛑 Получен сигнал остановки")
     except Exception as e:
-        logger.error(f"❌ Ошибка при запуске бота: {e}")
-        logger.exception("Детали ошибки:")
+        logger.error(f"❌ Критическая ошибка: {e}")
         sys.exit(1)
 
-
 if __name__ == "__main__":
-    # Запускаем бота
     asyncio.run(main()) 
