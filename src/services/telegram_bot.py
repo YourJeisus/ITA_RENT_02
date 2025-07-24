@@ -47,7 +47,12 @@ class TelegramBotService:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Команда /start - приветствие и инструкция по регистрации"""
         chat_id = str(update.effective_chat.id)
-        user = get_by_telegram_chat_id(self.get_db(), telegram_chat_id=chat_id)
+        
+        try:
+            user = get_by_telegram_chat_id(self.get_db(), telegram_chat_id=chat_id)
+        except Exception as e:
+            logger.error(f"Ошибка при поиске пользователя по chat_id {chat_id}: {e}")
+            user = None
         
         if user:
             # Пользователь уже привязан
@@ -333,6 +338,7 @@ class TelegramBotService:
         self.application.add_handler(CommandHandler("register", self.register_command))
         self.application.add_handler(CommandHandler("status", self.status_command))
         self.application.add_handler(CommandHandler("filters", self.filters_command))
+        self.application.add_handler(CommandHandler("dbtest", self.dbtest_command))
         
         # Обработчик команд приостановки фильтров
         self.application.add_handler(MessageHandler(
@@ -373,6 +379,45 @@ class TelegramBotService:
             await self.application.updater.stop()
             await self.application.stop()
     
+    async def dbtest_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Команда /dbtest - тест подключения к базе данных"""
+        chat_id = str(update.effective_chat.id)
+        
+        try:
+            # Проверяем подключение к базе данных
+            db = self.get_db()
+            
+            # Считаем количество пользователей
+            from src.db.models import User, Listing
+            users_count = db.query(User).count()
+            listings_count = db.query(Listing).count()
+            
+            # Проверяем текущего пользователя по chat_id
+            current_user = get_by_telegram_chat_id(db, telegram_chat_id=chat_id)
+            
+            response = f"🔍 **Тест базы данных:**\n\n"
+            response += f"✅ Подключение к БД: Успешно\n"
+            response += f"👥 Всего пользователей: {users_count}\n"
+            response += f"🏠 Всего объявлений: {listings_count}\n"
+            response += f"🤖 Ваш chat_id: `{chat_id}`\n"
+            
+            if current_user:
+                response += f"✅ Ваш аккаунт найден: {current_user.email}\n"
+                response += f"🆔 Ваш ID: {current_user.id}\n"
+            else:
+                response += f"❌ Ваш аккаунт не привязан к Telegram\n"
+            
+            await update.message.reply_text(response, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Ошибка в команде /dbtest для chat_id {chat_id}: {e}")
+            await update.message.reply_text(
+                f"❌ **Ошибка теста БД:**\n\n"
+                f"```\n{str(e)}\n```\n\n"
+                f"Chat ID: `{chat_id}`", 
+                parse_mode='Markdown'
+            )
+
     async def stop(self):
         """Остановка бота"""
         if self.application:

@@ -1,6 +1,7 @@
 """
 CRUD операции для пользователей
 """
+import logging
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -8,6 +9,8 @@ from sqlalchemy import and_
 from src.crud.base import CRUDBase
 from src.db.models import User
 from src.schemas.user import UserCreate, UserUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
@@ -19,7 +22,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     
     def get_by_telegram_chat_id(self, db: Session, *, telegram_chat_id: str) -> Optional[User]:
         """Получить пользователя по Telegram chat ID"""
-        return db.query(User).filter(User.telegram_chat_id == telegram_chat_id).first()
+        try:
+            return db.query(User).filter(User.telegram_chat_id == telegram_chat_id).first()
+        except Exception as e:
+            logger.error(f"Ошибка при поиске пользователя по telegram_chat_id {telegram_chat_id}: {e}")
+            return None
     
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
         """Создать пользователя с хешированным паролем"""

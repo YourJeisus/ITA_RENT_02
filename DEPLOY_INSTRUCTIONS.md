@@ -9,9 +9,133 @@
 - ✅ Система уведомлений
 - ✅ База данных
 
+## 🚀 ПОШАГОВОЕ СОЗДАНИЕ СЕРВИСОВ В RAILWAY
+
+### ШАГ 1: Создание основного проекта
+
+1. Зайдите на [railway.app](https://railway.app)
+2. Нажмите **"New Project"**
+3. Выберите **"Deploy from GitHub repo"**
+4. Подключите ваш репозиторий `ITA_RENT_02`
+5. Railway создаст **первый сервис автоматически** (это будет backend API)
+
+### ШАГ 2: Создание PostgreSQL базы данных
+
+1. В проекте нажмите **"+ New Service"**
+2. Выберите **"Database"** → **"PostgreSQL"**
+3. База данных создается автоматически
+4. Railway автоматически установит переменную `DATABASE_URL` для всех сервисов
+
+### ШАГ 3: Настройка основного сервиса (Backend API)
+
+1. Кликните на **первый созданный сервис** (обычно называется по имени репозитория)
+2. Перейдите в **"Settings"** → **"General"**
+3. Измените **Service Name** на `backend`
+4. В **"Settings"** → **"Deploy"** убедитесь, что:
+   - **Source Repo**: ваш репозиторий
+   - **Branch**: main
+   - **Start Command**: оставьте пустым (будет использован Dockerfile)
+
+### ШАГ 4: Добавление переменных окружения для Backend
+
+1. В сервисе `backend` перейдите в **"Variables"**
+2. Добавьте переменные **одну за одной**:
+
+```bash
+ENVIRONMENT=production
+DEBUG=false
+SECRET_KEY=production-super-secret-key-change-me-12345
+TELEGRAM_BOT_TOKEN=7894689920:AAFZldrCNcqv24wsIEi5pUvNIPgHWPkWlvc
+SCRAPERAPI_KEY=ff8892f744de6a7c18a7a02ff41d8da3
+SCRAPER_WORKER_INTERVAL_HOURS=6
+SCRAPER_WORKER_MAX_PAGES=10
+```
+
+3. Нажмите **"Deploy"** для применения изменений
+
+### ШАГ 5: Создание Telegram Bot сервиса
+
+1. В проекте нажмите **"+ New Service"**
+2. Выберите **"GitHub Repo"**
+3. Выберите тот же репозиторий `ITA_RENT_02`
+4. После создания:
+   - **Settings** → **General** → **Service Name**: `telegram-bot`
+   - **Settings** → **Deploy** → **Start Command**: `python run_telegram_bot.py`
+
+### ШАГ 6: Переменные окружения для Telegram Bot
+
+В сервисе `telegram-bot` → **"Variables"** добавьте:
+
+```bash
+ENVIRONMENT=production
+SECRET_KEY=production-super-secret-key-change-me-12345
+TELEGRAM_BOT_TOKEN=7894689920:AAFZldrCNcqv24wsIEi5pUvNIPgHWPkWlvc
+SERVICE_TYPE=telegram-bot
+PYTHONPATH=/app
+```
+
+### ШАГ 7: Создание Notification Worker сервиса
+
+1. **"+ New Service"** → **"GitHub Repo"** → тот же репозиторий
+2. Настройки:
+   - **Service Name**: `notification-worker`
+   - **Start Command**: `while true; do python cron_notifications.py; sleep 1800; done`
+
+### ШАГ 8: Переменные окружения для Notification Worker
+
+```bash
+ENVIRONMENT=production
+SECRET_KEY=production-super-secret-key-change-me-12345
+TELEGRAM_BOT_TOKEN=7894689920:AAFZldrCNcqv24wsIEi5pUvNIPgHWPkWlvc
+SERVICE_TYPE=notification-worker
+PYTHONPATH=/app
+```
+
+### ШАГ 9: Создание Scraper Worker сервиса
+
+1. **"+ New Service"** → **"GitHub Repo"** → тот же репозиторий
+2. Настройки:
+   - **Service Name**: `scraper-worker`
+   - **Start Command**: `while true; do python cron_scraper.py; sleep 21600; done`
+
+### ШАГ 10: Переменные окружения для Scraper Worker
+
+```bash
+ENVIRONMENT=production
+SECRET_KEY=production-super-secret-key-change-me-12345
+SCRAPERAPI_KEY=ff8892f744de6a7c18a7a02ff41d8da3
+SCRAPER_WORKER_INTERVAL_HOURS=6
+SCRAPER_WORKER_MAX_PAGES=10
+SERVICE_TYPE=scraper-worker
+PYTHONPATH=/app
+```
+
+### ШАГ 11: Создание Frontend сервиса (если нужен)
+
+1. **"+ New Service"** → **"GitHub Repo"** → тот же репозиторий
+2. Настройки:
+   - **Service Name**: `frontend`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Start Command**: `npm run start`
+
+## 📦 Итоговая структура сервисов
+
+После создания у вас должно быть **5 сервисов**:
+
+```
+📊 Railway Project: ITA_RENT_BOT
+├── 🌐 backend (API сервер)
+├── 🤖 telegram-bot (Telegram бот)
+├── 🔔 notification-worker (уведомления каждые 30 мин)
+├── 🕷️ scraper-worker (парсинг каждые 6 часов)
+├── 💻 frontend (React приложение, опционально)
+└── 🗄️ postgres (база данных)
+```
+
 ## 🔧 Переменные окружения для Railway
 
-### Обязательные переменные:
+### Обязательные переменные для ВСЕХ сервисов:
 
 ```bash
 # Основные настройки
@@ -36,70 +160,44 @@ SCRAPER_WORKER_MAX_PAGES=10
 - `PORT` - порт приложения
 - `RAILWAY_ENVIRONMENT=production`
 
-## 📦 Структура сервисов в Railway
+## ⚡ ВАЖНЫЕ КОМАНДЫ ЗАПУСКА
 
-```
-ITA_RENT_BOT/
-├── backend (API сервер)
-├── frontend (React приложение)
-├── scraper-worker (парсинг каждые 6 часов)
-├── telegram-bot (Telegram бот)
-├── notification-worker (уведомления каждые 30 мин)
-└── postgres (база данных)
-```
+Убедитесь, что **Start Command** установлены правильно:
 
-## 🚀 Команды для деплоя
-
-```bash
-# 1. Коммит всех изменений
-git add .
-git commit -m "feat: Complete Telegram bot system (Stage 6)"
-
-# 2. Пуш в main ветку
-git push origin main
-
-# 3. Railway автоматически развернет все сервисы
-```
-
-## ⚙️ Настройка в Railway Dashboard
-
-### 1. Переменные окружения
-
-Добавьте все переменные из списка выше в Railway Dashboard
-
-### 2. Сервисы
-
-Railway автоматически создаст сервисы согласно `railway.toml`:
-
-- `backend` - основной API
-- `telegram-bot` - Telegram бот
-- `notification-worker` - диспетчер уведомлений
-- `scraper-worker` - парсинг данных
-
-### 3. База данных
-
-Railway автоматически создаст PostgreSQL и установит `DATABASE_URL`
+| Сервис                | Start Command                                                   |
+| --------------------- | --------------------------------------------------------------- |
+| `backend`             | _(пусто - использует Dockerfile)_                               |
+| `telegram-bot`        | `python run_telegram_bot.py`                                    |
+| `notification-worker` | `while true; do python cron_notifications.py; sleep 1800; done` |
+| `scraper-worker`      | `while true; do python cron_scraper.py; sleep 21600; done`      |
+| `frontend`            | `npm run start`                                                 |
 
 ## 🧪 Проверка после деплоя
 
-### 1. API проверки:
+### 1. Проверьте статус всех сервисов:
+
+- Все сервисы должны показывать **"Active"** статус
+- Нет ошибок в логах
+
+### 2. API проверки:
 
 ```bash
-curl https://your-app.railway.app/health
-curl https://your-app.railway.app/api/v1/telegram/status
+curl https://your-backend-url.railway.app/health
+curl https://your-backend-url.railway.app/api/v1/telegram/status
 ```
 
-### 2. Telegram бот:
+### 3. Telegram бот:
 
 - Отправьте `/start` боту
 - Попробуйте `/help`
 - Проверьте `/register your@email.com`
 
-### 3. Логи сервисов:
+### 4. Логи сервисов:
 
-- Проверьте логи `telegram-bot` сервиса
-- Проверьте логи `notification-worker`
-- Убедитесь, что нет ошибок
+- **backend**: API запросы и ответы
+- **telegram-bot**: Сообщения от пользователей
+- **notification-worker**: Отправка уведомлений каждые 30 мин
+- **scraper-worker**: Парсинг данных каждые 6 часов
 
 ## 🔔 Настройка webhook (опционально)
 
@@ -110,9 +208,35 @@ curl -X POST \
   "https://api.telegram.org/bot7894689920:AAFZldrCNcqv24wsIEi5pUvNIPgHWPkWlvc/setWebhook" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://your-app.railway.app/api/v1/telegram/webhook"
+    "url": "https://your-backend-url.railway.app/api/v1/telegram/webhook"
   }'
 ```
+
+## 🚨 Решение типичных проблем
+
+### ❌ Ошибка: "Module not found"
+
+**Решение**: Добавьте переменную `PYTHONPATH=/app` во все Python сервисы
+
+### ❌ Ошибка: "Database connection failed"
+
+**Решение**: Убедитесь, что PostgreSQL сервис создан и переменная `DATABASE_URL` установлена
+
+### ❌ Ошибка: "Telegram bot не отвечает"
+
+**Решение**:
+
+1. Проверьте логи `telegram-bot` сервиса
+2. Убедитесь, что `TELEGRAM_BOT_TOKEN` правильный
+3. Проверьте, что сервис показывает "Active" статус
+
+### ❌ Ошибка: "Build failed"
+
+**Решение**:
+
+1. Убедитесь, что все файлы закоммичены в git
+2. Проверьте, что `requirements.txt` содержит все зависимости
+3. Перезапустите деплой
 
 ## 📊 Мониторинг
 
@@ -140,5 +264,5 @@ curl -X POST \
 ---
 
 **Статус**: ✅ Готово к деплою  
-**Время деплоя**: ~10-15 минут  
+**Время деплоя**: ~20-30 минут (создание сервисов вручную)  
 **Последнее тестирование**: Январь 2025
