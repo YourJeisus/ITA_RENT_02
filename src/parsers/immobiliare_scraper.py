@@ -34,7 +34,7 @@ class ImmobiliareScraper:
     def __init__(self, enable_geocoding: bool = True):
         self.name = "Immobiliare.it Async Scraper V2"
         self.base_url = "https://www.immobiliare.it"
-        self.search_url = "https://www.immobiliare.it/affitto-case/roma/"
+        self.search_url = "https://www.immobiliare.it/affitto-case/roma/?criterio=data&ordine=desc"
         self.enable_geocoding = enable_geocoding
         
         # ScraperAPI endpoints
@@ -53,7 +53,7 @@ class ImmobiliareScraper:
         """Строит URL для конкретной страницы"""
         if page <= 1:
             return self.search_url
-        return f"{self.search_url}?pag={page}"
+        return f"{self.search_url}&pag={page}"
     
     async def submit_async_job(self, url: str, page_num: int) -> Optional[Dict[str, Any]]:
         """
