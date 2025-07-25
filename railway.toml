@@ -72,7 +72,7 @@ build.dockerfilePath = "Dockerfile.prod"
 build.buildCommand = "echo 'Notification worker service'"
 
 [services.notification-worker.deploy]
-startCommand = "python run_notification_worker.py"
+startCommand = "python test_notification_worker_debug.py"
 healthcheckPath = ""
 healthcheckTimeout = 300
 restartPolicyType = "always"
@@ -81,7 +81,7 @@ restartPolicyType = "always"
 PYTHONPATH = "/app"
 ENVIRONMENT = "production"
 SERVICE_TYPE = "notification-worker"
-DEBUG_NOTIFICATIONS = "false"
+DEBUG_NOTIFICATIONS = "true"
 
 # PostgreSQL база данных (создается автоматически в Railway)
 # [[services]]
