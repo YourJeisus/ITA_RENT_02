@@ -4,7 +4,7 @@ MVP версия для отправки уведомлений о новых о
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
@@ -50,7 +50,16 @@ class NotificationService:
         
         # Проверяем время последнего уведомления для этого фильтра
         if filter_obj.last_notification_sent:
-            time_since_last = datetime.utcnow() - filter_obj.last_notification_sent
+            now = datetime.now(timezone.utc)
+            last_sent = filter_obj.last_notification_sent
+            
+            # Приводим к единому формату для сравнения
+            if last_sent.tzinfo is None and now.tzinfo is not None:
+                now = now.replace(tzinfo=None)
+            elif last_sent.tzinfo is not None and now.tzinfo is None:
+                last_sent = last_sent.replace(tzinfo=None)
+            
+            time_since_last = now - last_sent
             if time_since_last < notification_frequency:
                 return False
         
@@ -62,7 +71,7 @@ class NotificationService:
         """
         try:
             # Время, после которого объявления считаются новыми
-            since_time = datetime.utcnow() - timedelta(hours=since_hours)
+            since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours)
             
             # Создаем параметры поиска из фильтра
             search_params = {
@@ -91,8 +100,19 @@ class NotificationService:
             # Фильтруем только новые объявления
             new_listings = []
             for listing in all_listings:
-                if listing.created_at and listing.created_at >= since_time:
-                    new_listings.append(listing)
+                if listing.created_at:
+                    # Приводим даты к единому формату для сравнения
+                    listing_time = listing.created_at
+                    compare_time = since_time
+                    
+                    # Если одна дата с timezone, а другая без - приводим к naive
+                    if listing_time.tzinfo is None and compare_time.tzinfo is not None:
+                        compare_time = compare_time.replace(tzinfo=None)
+                    elif listing_time.tzinfo is not None and compare_time.tzinfo is None:
+                        listing_time = listing_time.replace(tzinfo=None)
+                    
+                    if listing_time >= compare_time:
+                        new_listings.append(listing)
             
             logger.info(f"Найдено {len(new_listings)} новых объявлений для фильтра {filter_obj.id}")
             return new_listings
@@ -170,7 +190,7 @@ class NotificationService:
             
             if success:
                 # Обновляем время последнего уведомления
-                filter_obj.last_notification_sent = datetime.utcnow()
+                filter_obj.last_notification_sent = datetime.now(timezone.utc).replace(tzinfo=None)
                 self.get_db().add(filter_obj)
                 self.get_db().commit()
                 
@@ -185,7 +205,7 @@ class NotificationService:
                         listing_id=first_listing_id,  # Берем первое объявление
                         notification_type="new_listing",
                         status="sent",
-                        sent_at=datetime.utcnow(),
+                        sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
                         message=f"Отправлено {len(listings)} объявлений"
                     )
                     self.get_db().add(notification)
