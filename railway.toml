@@ -63,7 +63,7 @@ PYTHONPATH = "/app"
 ENVIRONMENT = "production"
 SERVICE_TYPE = "telegram-bot"
 
-# Диспетчер уведомлений (cron)
+# Диспетчер уведомлений (постоянный worker)
 [[services]]
 name = "notification-worker"
 source = "."
@@ -82,6 +82,7 @@ PYTHONPATH = "/app"
 ENVIRONMENT = "production"
 SERVICE_TYPE = "notification-worker"
 DEBUG_NOTIFICATIONS = "true"
+NOTIFICATION_INTERVAL_SECONDS = "300"
 
 # PostgreSQL база данных (создается автоматически в Railway)
 # [[services]]
