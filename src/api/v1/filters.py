@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import get_db, get_current_user
 from src.crud.crud_filter import filter as crud_filter
-from src.schemas.filter import FilterCreate, FilterUpdate, FilterResponse
+from src.schemas.filter import FilterCreate, FilterUpdate, FilterResponse, Filter
 from src.db.models import User
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[FilterResponse])
+@router.get("/", response_model=List[Filter])
 async def get_user_filters(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -25,7 +25,7 @@ async def get_user_filters(
     return filters
 
 
-@router.post("/", response_model=FilterResponse)
+@router.post("/", response_model=Filter)
 async def create_filter(
     filter_data: FilterCreate,
     current_user: User = Depends(get_current_user),
@@ -51,7 +51,7 @@ async def create_filter(
             detail="Превышен лимит фильтров для премиум подписки. Максимум 5 фильтров."
         )
     
-    filter_obj = crud_filter.create_with_user(
+    filter_obj = crud_filter.create_with_owner(
         db=db,
         obj_in=filter_data,
         user_id=current_user.id
@@ -59,7 +59,7 @@ async def create_filter(
     return filter_obj
 
 
-@router.get("/{filter_id}", response_model=FilterResponse)
+@router.get("/{filter_id}", response_model=Filter)
 async def get_filter(
     filter_id: int,
     current_user: User = Depends(get_current_user),
@@ -78,7 +78,7 @@ async def get_filter(
     return filter_obj
 
 
-@router.put("/{filter_id}", response_model=FilterResponse)
+@router.put("/{filter_id}", response_model=Filter)
 async def update_filter(
     filter_id: int,
     filter_update: FilterUpdate,

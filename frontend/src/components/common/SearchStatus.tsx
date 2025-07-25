@@ -58,12 +58,18 @@ const SearchStatus: React.FC<SearchStatusProps> = ({
 
       // Убираем сообщение через 5 секунд
       setTimeout(() => setSaveMessage(null), 5000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Ошибка сохранения фильтра:", error);
-      setSaveMessage("❌ Ошибка при сохранении фильтра. Попробуйте еще раз.");
 
-      // Убираем сообщение об ошибке через 5 секунд
-      setTimeout(() => setSaveMessage(null), 5000);
+      // Используем улучшенное сообщение об ошибке
+      const errorMessage =
+        error?.userMessage ||
+        error?.response?.data?.detail ||
+        "Неизвестная ошибка";
+      setSaveMessage(`❌ ${errorMessage}`);
+
+      // Убираем сообщение об ошибке через 7 секунд
+      setTimeout(() => setSaveMessage(null), 7000);
     } finally {
       setIsSaving(false);
     }

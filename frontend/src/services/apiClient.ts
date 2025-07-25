@@ -64,6 +64,54 @@ apiClient.interceptors.response.use(
   (error) => {
     console.error("API Error:", error);
 
+    // Улучшенная обработка ошибок
+    let errorMessage = "Произошла ошибка";
+
+    if (error.response) {
+      // Сервер ответил с кодом ошибки
+      const { status, data } = error.response;
+
+      switch (status) {
+        case 401:
+          errorMessage = "Необходима авторизация";
+          // Можно автоматически перенаправить на страницу входа
+          break;
+        case 403:
+          errorMessage = data?.detail || "Нет доступа";
+          break;
+        case 404:
+          errorMessage = "Ресурс не найден";
+          break;
+        case 422:
+          // Ошибки валидации
+          if (data?.detail) {
+            if (Array.isArray(data.detail)) {
+              errorMessage = data.detail.map((err: any) => err.msg).join(", ");
+            } else {
+              errorMessage = data.detail;
+            }
+          } else {
+            errorMessage = "Ошибка валидации данных";
+          }
+          break;
+        case 500:
+          errorMessage = "Внутренняя ошибка сервера";
+          break;
+        default:
+          errorMessage = data?.detail || data?.message || `Ошибка ${status}`;
+      }
+    } else if (error.request) {
+      // Запрос был отправлен, но ответа нет
+      errorMessage = "Сервер не отвечает";
+    } else {
+      // Ошибка настройки запроса
+      errorMessage = error.message || "Ошибка запроса";
+    }
+
+    // Добавляем читаемое сообщение ошибки
+    error.userMessage = errorMessage;
+    console.error("Readable error:", errorMessage);
+
     // Если API недоступен, показываем предупреждение но не ломаем приложение
     if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK") {
       console.warn("API недоступен, используем моковые данные");

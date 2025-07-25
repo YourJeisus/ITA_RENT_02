@@ -46,6 +46,10 @@ class CRUDFilter(CRUDBase[Filter, FilterCreate, FilterUpdate]):
         db.refresh(db_obj)
         return db_obj
     
+    def create_with_owner(self, db: Session, *, obj_in: FilterCreate, user_id: int) -> Filter:
+        """Создать фильтр для пользователя (алиас для create_with_user)"""
+        return self.create_with_user(db=db, obj_in=obj_in, user_id=user_id)
+    
     def get_filters_for_notification(self, db: Session) -> List[Filter]:
         """Получить фильтры, готовые для отправки уведомлений"""
         # Получаем фильтры, которые:
