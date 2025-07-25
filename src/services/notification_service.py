@@ -37,9 +37,11 @@ class NotificationService:
         Проверка, нужно ли отправлять уведомление для этого фильтра
         """
         if not filter_obj.is_active:
+            logger.info(f"❌ Фильтр {filter_obj.id} неактивен")
             return False
         
         if not user.telegram_chat_id:
+            logger.info(f"❌ У пользователя {user.email} нет telegram_chat_id")
             return False
         
         # Определяем частоту уведомлений в зависимости от подписки
@@ -61,11 +63,13 @@ class NotificationService:
             
             time_since_last = now - last_sent
             if time_since_last < notification_frequency:
+                logger.info(f"⏰ Слишком рано для уведомления. Прошло {time_since_last}, нужно {notification_frequency}")
                 return False
         
+        logger.info(f"✅ Можно отправлять уведомление для фильтра {filter_obj.id}")
         return True
     
-    def get_new_listings_for_filter(self, filter_obj: Filter, since_hours: int = 24) -> List[Listing]:
+    def get_new_listings_for_filter(self, filter_obj: Filter, since_hours: int = 72) -> List[Listing]:
         """
         Получение новых объявлений по фильтру за последние N часов
         """
@@ -97,6 +101,9 @@ class NotificationService:
             from src.crud.crud_listing import listing as crud_listing
             all_listings = crud_listing.search(self.get_db(), limit=50, **search_params_no_page)
             
+            logger.info(f"Всего найдено {len(all_listings)} объявлений для фильтра {filter_obj.id}")
+            logger.info(f"Ищем объявления новее чем: {since_time}")
+            
             # Фильтруем только новые объявления
             new_listings = []
             for listing in all_listings:
@@ -105,14 +112,21 @@ class NotificationService:
                     listing_time = listing.created_at
                     compare_time = since_time
                     
+                    logger.info(f"Объявление {listing.id}: created_at={listing_time}, сравниваем с {compare_time}")
+                    
                     # Если одна дата с timezone, а другая без - приводим к naive
                     if listing_time.tzinfo is None and compare_time.tzinfo is not None:
                         compare_time = compare_time.replace(tzinfo=None)
+                        logger.info(f"Приведено compare_time к naive: {compare_time}")
                     elif listing_time.tzinfo is not None and compare_time.tzinfo is None:
                         listing_time = listing_time.replace(tzinfo=None)
+                        logger.info(f"Приведено listing_time к naive: {listing_time}")
                     
                     if listing_time >= compare_time:
                         new_listings.append(listing)
+                        logger.info(f"✅ Объявление {listing.id} добавлено как новое")
+                    else:
+                        logger.info(f"❌ Объявление {listing.id} слишком старое")
             
             logger.info(f"Найдено {len(new_listings)} новых объявлений для фильтра {filter_obj.id}")
             return new_listings
@@ -243,6 +257,7 @@ class NotificationService:
             for filter_obj in active_filters:
                 # Проверяем, нужно ли отправлять уведомление
                 if not self.should_send_notification(user, filter_obj):
+                    logger.info(f"⏰ Пропускаем фильтр {filter_obj.id} - слишком рано для следующего уведомления")
                     continue
                 
                 # Получаем новые объявления
