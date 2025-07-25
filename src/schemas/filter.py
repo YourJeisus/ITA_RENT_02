@@ -62,9 +62,7 @@ class FilterCreate(FilterBase):
         if v is not None:
             allowed_types = [
                 'apartment', 'house', 'room', 'studio', 
-                'penthouse', 'villa', 'loft', 'duplex',
-                'attic', 'basement', 'garage', 'commercial',
-                'office', 'warehouse', 'shop', 'all'
+                'penthouse', 'all'
             ]
             if v not in allowed_types:
                 raise ValueError(f'Тип недвижимости должен быть одним из: {", ".join(allowed_types)}')

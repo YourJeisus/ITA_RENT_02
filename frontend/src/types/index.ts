@@ -3,17 +3,15 @@ export interface City {
   name: string;
 }
 
-export type TransactionType = 'buy' | 'rent';
+export type TransactionType = "buy" | "rent";
 export type PropertyType =
-  | 'apartment'
-  | 'room'
-  | 'house'
-  | 'studio'
-  | 'villa'
-  | 'penthouse'
-  | 'loft'
-  | 'all';
-export type RoomOption = 'studio' | '1' | '2' | '3' | '4' | '5+';
+  | "apartment"
+  | "house"
+  | "penthouse"
+  | "studio"
+  | "room"
+  | "all";
+export type RoomOption = "studio" | "1" | "2" | "3" | "4" | "5+";
 
 export interface FilterState {
   city: City | null;
@@ -114,7 +112,7 @@ export interface Filter {
 export interface Subscription {
   id: number;
   user_id: number;
-  subscription_type: 'free' | 'premium_monthly' | 'premium_annual';
+  subscription_type: "free" | "premium_monthly" | "premium_annual";
   start_date: string;
   end_date?: string;
   is_active: boolean;
