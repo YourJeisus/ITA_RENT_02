@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.core.config import settings
 from src.db.database import get_db
-from src.db.models import User, Filter, Listing, Notification
+from src.db.models import User, Filter, Listing, Notification, SentNotification
 # from src.crud.crud_user import get_all_active_users  # Не используется в MVP
 from src.crud.crud_filter import filter as crud_filter
 from src.crud.crud_listing import search_listings
@@ -25,12 +25,23 @@ class NotificationService:
     
     def __init__(self):
         self.db = None
+        self._ensure_sent_notifications_table()
     
     def get_db(self) -> Session:
         """Получение сессии базы данных"""
         if not self.db:
             self.db = next(get_db())
         return self.db
+    
+    def _ensure_sent_notifications_table(self):
+        """Создает таблицу sent_notifications если её нет"""
+        try:
+            from src.db.database import engine, Base
+            # Создаем все таблицы (включая SentNotification)
+            Base.metadata.create_all(bind=engine)
+            logger.info("✅ Таблица sent_notifications проверена/создана")
+        except Exception as e:
+            logger.warning(f"Ошибка создания таблицы sent_notifications: {e}")
     
     def should_send_notification(self, user: User, filter_obj: Filter) -> bool:
         """
@@ -69,13 +80,21 @@ class NotificationService:
         logger.info(f"✅ Можно отправлять уведомление для фильтра {filter_obj.id}")
         return True
     
-    def get_new_listings_for_filter(self, filter_obj: Filter, since_hours: int = 72) -> List[Listing]:
+    def get_new_listings_for_filter(self, filter_obj: Filter, user_id: int) -> List[Listing]:
         """
-        Получение новых объявлений по фильтру за последние N часов
+        Получение новых объявлений по фильтру с защитой от дубликатов
+        
+        Логика:
+        1. Если первый запуск фильтра (нет last_notification_sent) - до 30 самых свежих
+        2. Если повторный запуск - только новые за 24 часа
+        3. Исключаем уже отправленные объявления
         """
         try:
-            # Время, после которого объявления считаются новыми
-            since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+            db = self.get_db()
+            
+            # Определяем режим работы
+            is_first_run = filter_obj.last_notification_sent is None
+            logger.info(f"🚀 Фильтр {filter_obj.id}: {'первый запуск' if is_first_run else 'повторный запуск'}")
             
             # Создаем параметры поиска из фильтра
             search_params = {
@@ -87,48 +106,59 @@ class NotificationService:
                 "max_rooms": filter_obj.max_rooms,
                 "min_area": filter_obj.min_area,
                 "max_area": filter_obj.max_area,
-                "page": 1,
-                "limit": 10  # Максимум 10 новых объявлений за раз
             }
             
             # Удаляем None значения
             search_params = {k: v for k, v in search_params.items() if v is not None}
             
-            # Упрощенный поиск для уведомлений - не используем пагинацию
-            search_params_no_page = {k: v for k, v in search_params.items() if k not in ['page', 'limit']}
-            
             # Ищем объявления напрямую через CRUD
             from src.crud.crud_listing import listing as crud_listing
-            all_listings = crud_listing.search(self.get_db(), limit=50, **search_params_no_page)
             
-            logger.info(f"Всего найдено {len(all_listings)} объявлений для фильтра {filter_obj.id}")
-            logger.info(f"Ищем объявления новее чем: {since_time}")
+            if is_first_run:
+                # Первый запуск - берем до 30 самых свежих объявлений
+                all_listings = crud_listing.search(db, limit=30, **search_params)
+                logger.info(f"🔍 Первый запуск: найдено {len(all_listings)} объявлений (лимит 30)")
+            else:
+                # Повторный запуск - только новые за 24 часа
+                since_time = datetime.now(timezone.utc) - timedelta(hours=24)
+                all_listings = crud_listing.search(db, limit=50, **search_params)
+                
+                # Фильтруем по дате
+                fresh_listings = []
+                for listing in all_listings:
+                    if listing.created_at:
+                        listing_time = listing.created_at
+                        compare_time = since_time
+                        
+                        # Приводим к единому формату
+                        if listing_time.tzinfo is None and compare_time.tzinfo is not None:
+                            compare_time = compare_time.replace(tzinfo=None)
+                        elif listing_time.tzinfo is not None and compare_time.tzinfo is None:
+                            listing_time = listing_time.replace(tzinfo=None)
+                        
+                        if listing_time >= compare_time:
+                            fresh_listings.append(listing)
+                
+                all_listings = fresh_listings
+                logger.info(f"🔍 Повторный запуск: найдено {len(all_listings)} новых объявлений за 24ч")
             
-            # Фильтруем только новые объявления
-            new_listings = []
-            for listing in all_listings:
-                if listing.created_at:
-                    # Приводим даты к единому формату для сравнения
-                    listing_time = listing.created_at
-                    compare_time = since_time
-                    
-                    logger.info(f"Объявление {listing.id}: created_at={listing_time}, сравниваем с {compare_time}")
-                    
-                    # Если одна дата с timezone, а другая без - приводим к naive
-                    if listing_time.tzinfo is None and compare_time.tzinfo is not None:
-                        compare_time = compare_time.replace(tzinfo=None)
-                        logger.info(f"Приведено compare_time к naive: {compare_time}")
-                    elif listing_time.tzinfo is not None and compare_time.tzinfo is None:
-                        listing_time = listing_time.replace(tzinfo=None)
-                        logger.info(f"Приведено listing_time к naive: {listing_time}")
-                    
-                    if listing_time >= compare_time:
-                        new_listings.append(listing)
-                        logger.info(f"✅ Объявление {listing.id} добавлено как новое")
-                    else:
-                        logger.info(f"❌ Объявление {listing.id} слишком старое")
+            # Получаем список уже отправленных объявлений для этого пользователя
+            sent_listing_ids = set(
+                row[0] for row in 
+                db.query(SentNotification.listing_id)
+                .filter(SentNotification.user_id == user_id)
+                .all()
+            )
             
-            logger.info(f"Найдено {len(new_listings)} новых объявлений для фильтра {filter_obj.id}")
+            # Исключаем уже отправленные объявления
+            new_listings = [
+                listing for listing in all_listings 
+                if listing.id not in sent_listing_ids
+            ]
+            
+            logger.info(f"📋 Исключено {len(all_listings) - len(new_listings)} уже отправленных объявлений")
+            logger.info(f"✅ Найдено {len(new_listings)} новых объявлений для отправки")
+            
             return new_listings
             
         except Exception as e:
@@ -203,32 +233,49 @@ class NotificationService:
             )
             
             if success:
+                db = self.get_db()
+                
                 # Обновляем время последнего уведомления
                 filter_obj.last_notification_sent = datetime.now(timezone.utc).replace(tzinfo=None)
-                self.get_db().add(filter_obj)
-                self.get_db().commit()
+                db.add(filter_obj)
                 
-                # Создаем запись уведомления (опционально для статистики)
+                # Сохраняем каждое отправленное объявление в SentNotification
+                for listing in listings:
+                    try:
+                        sent_notification = SentNotification(
+                            user_id=user.id,
+                            filter_id=filter_obj.id,
+                            listing_id=listing.id,
+                            notification_type="new_listing"
+                        )
+                        db.add(sent_notification)
+                    except Exception as e:
+                        # Игнорируем ошибки дублирования (уникальный индекс)
+                        logger.debug(f"Объявление {listing.id} уже было отправлено пользователю {user.id}")
+                
+                # Создаем общую запись в Notification для статистики
                 try:
-                    # Берем первое объявление из списка для записи
-                    first_listing_id = listings[0].id if listings else None
-                    
                     notification = Notification(
                         user_id=user.id,
                         filter_id=filter_obj.id,
-                        listing_id=first_listing_id,  # Берем первое объявление
+                        listing_id=listings[0].id if listings else None,
                         notification_type="new_listing",
                         status="sent",
                         sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
                         message=f"Отправлено {len(listings)} объявлений"
                     )
-                    self.get_db().add(notification)
-                    self.get_db().commit()
+                    db.add(notification)
                 except Exception as e:
-                    logger.warning(f"Не удалось сохранить запись уведомления: {e}")
+                    logger.warning(f"Не удалось сохранить запись статистики: {e}")
                 
-                logger.info(f"Уведомление отправлено пользователю {user.email} для фильтра {filter_obj.id}")
-                return True
+                try:
+                    db.commit()
+                    logger.info(f"📧 Уведомление отправлено пользователю {user.email} о {len(listings)} объявлениях")
+                    return True
+                except Exception as e:
+                    logger.error(f"Ошибка сохранения в БД: {e}")
+                    db.rollback()
+                    return False
             
             return False
             
@@ -261,7 +308,7 @@ class NotificationService:
                     continue
                 
                 # Получаем новые объявления
-                new_listings = self.get_new_listings_for_filter(filter_obj)
+                new_listings = self.get_new_listings_for_filter(filter_obj, user.id)
                 
                 if not new_listings:
                     continue

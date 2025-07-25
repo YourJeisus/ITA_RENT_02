@@ -8,7 +8,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
 from src.db.database import Base
@@ -308,4 +308,33 @@ class ScrapingSession(Base):
     )
 
     def __repr__(self):
-        return f"<ScrapingSession(id={self.id}, source={self.source}, status={self.status})>" 
+        return f"<ScrapingSession(id={self.id}, source={self.source}, status={self.status})>"
+
+
+class SentNotification(Base):
+    """
+    Модель для отслеживания отправленных уведомлений
+    Предотвращает дублирование уведомлений об одном объявлении
+    """
+    __tablename__ = "sent_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    filter_id: Mapped[int] = mapped_column(Integer, ForeignKey("filters.id"), index=True)
+    listing_id: Mapped[int] = mapped_column(Integer, ForeignKey("listings.id"), index=True)
+    
+    # Метаданные
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    notification_type: Mapped[str] = mapped_column(String(50), default="new_listing")
+
+    # Индексы для быстрого поиска
+    __table_args__ = (
+        Index('idx_sent_user_listing', 'user_id', 'listing_id'),
+        Index('idx_sent_filter_listing', 'filter_id', 'listing_id'),
+        Index('idx_sent_date', 'sent_at'),
+        # Уникальный индекс предотвращает дублирование
+        Index('idx_unique_notification', 'user_id', 'listing_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<SentNotification(user_id={self.user_id}, listing_id={self.listing_id})>" 
