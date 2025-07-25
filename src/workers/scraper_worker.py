@@ -38,8 +38,9 @@ class ScraperWorker:
     def __init__(self):
         self.scraping_service = ScrapingService()
         self.is_running = True
-        self.interval_hours = 6
-        self.max_pages = 10  # Парсим до 10 страниц за раз
+        # Читаем настройки из переменных окружения
+        self.interval_hours = settings.SCRAPER_WORKER_INTERVAL_HOURS
+        self.max_pages = settings.SCRAPER_WORKER_MAX_PAGES
         
         # Настройка обработчиков сигналов для graceful shutdown
         signal.signal(signal.SIGINT, self.signal_handler)
