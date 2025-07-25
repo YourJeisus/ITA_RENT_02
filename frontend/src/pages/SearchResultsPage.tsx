@@ -11,6 +11,9 @@ import styles from "./SearchResultsPage.module.scss";
 const SearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
+  const [currentFilters, setCurrentFilters] = useState<FilterState | null>(
+    null
+  );
 
   const {
     listings,
@@ -58,6 +61,7 @@ const SearchResultsPage: React.FC = () => {
       locationQuery: "", // Не используется пока
     };
 
+    setCurrentFilters(filtersForStore);
     fetchListings(filtersForStore, page);
   }, [searchParams, page, fetchListings]);
 
@@ -101,6 +105,7 @@ const SearchResultsPage: React.FC = () => {
           searchMessage={searchMessage}
           totalCount={totalListings}
           isLoading={isLoading}
+          currentFilters={currentFilters}
         />
 
         {error && (
