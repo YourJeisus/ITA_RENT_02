@@ -168,16 +168,33 @@ class NotificationService:
     def format_notification_message(self, listings: List[Listing], filter_obj: Filter) -> str:
         """
         Форматирование сообщения с уведомлением о новых объявлениях
+        Безопасное форматирование без сложной Markdown разметки
         """
         if not listings:
             return ""
         
-        # Заголовок сообщения
-        message = f"🏠 *Новые объявления по фильтру '{filter_obj.name}'*\n\n"
+        def clean_text(text: str) -> str:
+            """Очистка текста от проблемных символов"""
+            if not text:
+                return ""
+            return str(text).strip()
+        
+        # Заголовок сообщения (без разметки)
+        filter_name = clean_text(filter_obj.name)
+        message = f"🏠 Новые объявления\n"
+        message += f"🔍 Фильтр: {filter_name}\n\n"
         
         # Добавляем информацию о каждом объявлении
         for i, listing in enumerate(listings[:5], 1):  # Максимум 5 объявлений
-            # Базовая информация
+            # Безопасная обработка данных
+            title = clean_text(listing.title) if listing.title else "Без названия"
+            if len(title) > 60:
+                title = title[:57] + "..."
+            
+            address = clean_text(listing.address) if listing.address else "Адрес не указан"
+            if len(address) > 80:
+                address = address[:77] + "..."
+            
             price_text = f"{listing.price}€/мес" if listing.price else "Цена не указана"
             
             # Дополнительная информация
@@ -187,30 +204,37 @@ class NotificationService:
             if listing.area:
                 details.append(f"📐 {listing.area} м²")
             if listing.property_type:
-                details.append(f"🏠 {listing.property_type}")
+                prop_type = clean_text(listing.property_type)
+                details.append(f"🏠 {prop_type}")
             
             details_text = " • ".join(details) if details else ""
             
-            message += f"*{i}. {listing.title[:50]}{'...' if len(listing.title) > 50 else ''}*\n"
-            message += f"📍 {listing.address}\n"
+            # Формируем сообщение без разметки
+            message += f"{i}. {title}\n"
+            message += f"📍 {address}\n"
             message += f"💰 {price_text}\n"
             
             if details_text:
                 message += f"{details_text}\n"
             
-            message += f"🔗 [Посмотреть объявление]({listing.url})\n\n"
+            # Ссылка без разметки
+            if listing.url:
+                clean_url = str(listing.url).strip()
+                message += f"🔗 {clean_url}\n\n"
+            else:
+                message += "\n"
         
         # Если объявлений больше 5, добавляем информацию об этом
         if len(listings) > 5:
             message += f"...и еще {len(listings) - 5} объявлений!\n\n"
         
         # Информация о фильтре
-        message += f"🔍 *Фильтр:* {filter_obj.name}\n"
         if filter_obj.city:
-            message += f"📍 Город: {filter_obj.city}\n"
+            city = clean_text(filter_obj.city)
+            message += f"📍 Город: {city}\n"
         
         # Управление фильтром
-        message += f"\n/pause_{filter_obj.id} - приостановить этот фильтр\n"
+        message += f"\n/pause_{filter_obj.id} - приостановить фильтр\n"
         message += "/filters - все ваши фильтры"
         
         return message

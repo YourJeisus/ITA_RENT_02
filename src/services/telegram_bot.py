@@ -432,7 +432,7 @@ telegram_bot = TelegramBotService()
 async def send_notification_to_user(
     telegram_chat_id: str, 
     message: str, 
-    parse_mode: str = 'Markdown'
+    parse_mode: str = None
 ) -> bool:
     """
     Отправка уведомления пользователю
