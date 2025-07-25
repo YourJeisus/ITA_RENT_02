@@ -394,15 +394,21 @@ def search_listings(db: Session, **filters) -> Dict[str, Any]:
     page = filters.pop('page', 1)
     limit = filters.pop('limit', 50)
     
+    # Конвертируем page в skip
+    skip = (page - 1) * limit
+    
     # Выполняем поиск
-    results = listing.search(db, page=page, limit=limit, **filters)
+    listings = listing.search(db, skip=skip, limit=limit, **filters)
+    
+    # Получаем общее количество для расчета страниц
+    total_count = listing.count_with_filters(db, filters=filters)
     
     return {
-        "listings": results["listings"],
-        "total": results["total"],
+        "listings": listings,
+        "total": total_count,
         "page": page,
         "limit": limit,
-        "total_pages": (results["total"] + limit - 1) // limit
+        "total_pages": (total_count + limit - 1) // limit
     }
 
 def get_listing_by_id(db: Session, listing_id: int) -> Optional[Listing]:

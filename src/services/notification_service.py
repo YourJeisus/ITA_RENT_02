@@ -81,12 +81,16 @@ class NotificationService:
             # Удаляем None значения
             search_params = {k: v for k, v in search_params.items() if v is not None}
             
-            # Ищем объявления
-            results = search_listings(self.get_db(), **search_params)
+            # Упрощенный поиск для уведомлений - не используем пагинацию
+            search_params_no_page = {k: v for k, v in search_params.items() if k not in ['page', 'limit']}
+            
+            # Ищем объявления напрямую через CRUD
+            from src.crud.crud_listing import listing as crud_listing
+            all_listings = crud_listing.search(self.get_db(), limit=50, **search_params_no_page)
             
             # Фильтруем только новые объявления
             new_listings = []
-            for listing in results.get("listings", []):
+            for listing in all_listings:
                 if listing.created_at and listing.created_at >= since_time:
                     new_listings.append(listing)
             
