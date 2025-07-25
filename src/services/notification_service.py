@@ -241,20 +241,38 @@ class NotificationService:
     
     async def send_notification_for_filter(self, user: User, filter_obj: Filter, listings: List[Listing]) -> bool:
         """
-        Отправка уведомления пользователю о новых объявлениях
+        Отправка уведомлений пользователю о новых объявлениях
+        Каждое объявление = отдельное сообщение с фотографиями
         """
         try:
-            # Форматируем сообщение
-            message = self.format_notification_message(listings, filter_obj)
+            from src.services.telegram_bot import send_listing_notification
             
-            if not message:
+            if not listings:
                 return False
             
-            # Отправляем уведомление
-            success = await send_notification_to_user(
-                telegram_chat_id=user.telegram_chat_id,
-                message=message
-            )
+            success_count = 0
+            
+            # Отправляем каждое объявление отдельным сообщением
+            for listing in listings[:5]:  # Максимум 5 объявлений за раз
+                try:
+                    notification_sent = await send_listing_notification(
+                        telegram_chat_id=user.telegram_chat_id,
+                        listing=listing,
+                        filter_obj=filter_obj
+                    )
+                    
+                    if notification_sent:
+                        success_count += 1
+                        
+                    # Пауза между сообщениями чтобы не спамить
+                    await asyncio.sleep(2)
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления об объявлении {listing.id}: {e}")
+                    continue
+            
+            # Если отправили хотя бы одно уведомление - считаем успехом
+            success = success_count > 0
             
             if success:
                 db = self.get_db()
@@ -294,7 +312,7 @@ class NotificationService:
                 
                 try:
                     db.commit()
-                    logger.info(f"📧 Уведомление отправлено пользователю {user.email} о {len(listings)} объявлениях")
+                    logger.info(f"📧 Отправлено {success_count} уведомлений пользователю {user.email}")
                     return True
                 except Exception as e:
                     logger.error(f"Ошибка сохранения в БД: {e}")

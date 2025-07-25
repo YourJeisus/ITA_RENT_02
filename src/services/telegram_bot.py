@@ -456,6 +456,131 @@ async def send_notification_to_user(
         return False
 
 
+async def send_listing_notification(
+    telegram_chat_id: str, 
+    listing,  # Используем без type hint чтобы избежать circular import
+    filter_obj
+) -> bool:
+    """
+    Отправка уведомления об одном объявлении с фотографиями
+    Новая улучшенная версия
+    """
+    try:
+        if not telegram_bot.application:
+            await telegram_bot.initialize()
+        
+        # Форматируем сообщение для одного объявления
+        message = format_single_listing_message(listing, filter_obj)
+        
+        # Если есть фотографии - отправляем с медиа
+        if listing.images and len(listing.images) > 0:
+            media_group = []
+            
+            # Берем первые 2 фотографии для коллажа
+            for i, image_url in enumerate(listing.images[:2]):
+                if image_url and image_url.strip():
+                    from telegram import InputMediaPhoto
+                    
+                    # Добавляем подпись только к первому фото
+                    caption = message if i == 0 else None
+                    media_group.append(InputMediaPhoto(
+                        media=image_url.strip(),
+                        caption=caption
+                    ))
+            
+            if media_group:
+                # Отправляем медиа-группу с подписью
+                await telegram_bot.application.bot.send_media_group(
+                    chat_id=telegram_chat_id,
+                    media=media_group
+                )
+                logger.info(f"Уведомление с фото отправлено в чат {telegram_chat_id}")
+                return True
+        
+        # Если нет фото - отправляем просто текст
+        await telegram_bot.application.bot.send_message(
+            chat_id=telegram_chat_id,
+            text=message
+        )
+        
+        logger.info(f"Текстовое уведомление отправлено в чат {telegram_chat_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления об объявлении: {e}")
+        return False
+
+
+def format_single_listing_message(listing, filter_obj) -> str:
+    """
+    Форматирование сообщения для одного объявления
+    """
+    def clean_text(text: str) -> str:
+        if not text:
+            return ""
+        return str(text).strip()
+    
+    # Заголовок
+    title = clean_text(listing.title) if listing.title else "Без названия"
+    if len(title) > 80:
+        title = title[:77] + "..."
+    
+    message = f"🏠 {title}\n"
+    
+    # Адрес
+    if listing.address:
+        address = clean_text(listing.address)
+        if len(address) > 100:
+            address = address[:97] + "..."
+        message += f"📍 {address}\n"
+    
+    # Цена
+    if listing.price:
+        message += f"💰 {listing.price}€/мес\n"
+    
+    # Детали
+    details = []
+    if listing.rooms:
+        details.append(f"🚪 {listing.rooms} комн.")
+    if listing.area:
+        details.append(f"📐 {listing.area} м²")
+    if listing.property_type:
+        prop_type = clean_text(listing.property_type)
+        details.append(f"🏠 {prop_type}")
+    if listing.floor:
+        details.append(f"🏢 {listing.floor} этаж")
+    
+    if details:
+        message += " • ".join(details) + "\n"
+    
+    # Дополнительные удобства
+    amenities = []
+    if listing.furnished:
+        amenities.append("🪑 Меблированная")
+    if listing.pets_allowed:
+        amenities.append("🐕 Разрешены питомцы")
+    
+    if amenities:
+        message += " • ".join(amenities) + "\n"
+    
+    message += "\n"
+    
+    # Ссылка на объявление (прямая или через редирект)
+    if listing.url:
+        # Можно добавить редирект через наш сайт для аналитики
+        # redirect_url = f"https://ita-rent-02.vercel.app/redirect/{listing.id}"
+        direct_url = clean_text(listing.url)
+        message += f"🔗 {direct_url}\n"
+    
+    # Информация о фильтре
+    message += f"\n🔍 Фильтр: {clean_text(filter_obj.name)}"
+    
+    # Управление
+    message += f"\n/pause_{filter_obj.id} - приостановить фильтр"
+    
+    return message
+
+
 if __name__ == "__main__":
     """Запуск бота для тестирования"""
     import os
