@@ -742,7 +742,92 @@ async def try_create_collage(image_urls: List[str]) -> Optional[str]:
     #         
     # except Exception as e:
     #     logger.warning(f"Ошибка создания коллажа: {e}")
-    #     return None
+#     return None
+
+
+async def send_filter_confirmation_message(telegram_chat_id: str, filter_obj, is_new: bool = True) -> bool:
+    """
+    Отправка подтверждающего сообщения о создании/обновлении фильтра
+    """
+    try:
+        # Формируем сообщение о настройке фильтра
+        action_text = "создан" if is_new else "обновлен"
+        message = f"✅ Фильтр успешно {action_text}!\n\n"
+        message += f"📋 <b>Название:</b> {filter_obj.name}\n"
+        
+        # Добавляем параметры фильтра
+        if filter_obj.city:
+            message += f"📍 <b>Город:</b> {filter_obj.city}\n"
+        
+        if filter_obj.min_price or filter_obj.max_price:
+            price_range = ""
+            if filter_obj.min_price:
+                price_range += f"от {filter_obj.min_price}€"
+            if filter_obj.max_price:
+                if price_range:
+                    price_range += f" до {filter_obj.max_price}€"
+                else:
+                    price_range += f"до {filter_obj.max_price}€"
+            message += f"💰 <b>Цена:</b> {price_range}/мес\n"
+        
+        if filter_obj.min_rooms or filter_obj.max_rooms:
+            rooms_range = ""
+            if filter_obj.min_rooms:
+                rooms_range += f"от {filter_obj.min_rooms}"
+            if filter_obj.max_rooms and filter_obj.min_rooms != filter_obj.max_rooms:
+                if rooms_range:
+                    rooms_range += f" до {filter_obj.max_rooms}"
+                else:
+                    rooms_range += f"до {filter_obj.max_rooms}"
+            elif filter_obj.min_rooms:
+                rooms_range = str(filter_obj.min_rooms)
+            message += f"🚪 <b>Комнат:</b> {rooms_range}\n"
+        
+        if filter_obj.property_type:
+            prop_types = {
+                'apartment': 'Квартира',
+                'house': 'Дом',
+                'room': 'Комната',
+                'studio': 'Студия'
+            }
+            type_name = prop_types.get(filter_obj.property_type, filter_obj.property_type)
+            message += f"🏠 <b>Тип:</b> {type_name}\n"
+        
+        message += f"\n🔔 <b>Уведомления:</b> {'включены' if filter_obj.notification_enabled else 'отключены'}\n"
+        
+        if filter_obj.notification_enabled:
+            freq_hours = filter_obj.notification_frequency_hours or 24
+            if freq_hours >= 24:
+                freq_text = f"{freq_hours // 24} раз в день"
+            else:
+                freq_text = f"каждые {freq_hours} часов"
+            message += f"⏱ <b>Частота:</b> {freq_text}\n"
+        
+        message += "\n🎯 Как только появятся новые объявления, соответствующие вашему фильтру, я сразу пришлю их вам!"
+        
+        # Отправляем сообщение
+        from src.core.config import settings
+        import aiohttp
+        
+        url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": telegram_chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data) as response:
+                if response.status == 200:
+                    return True
+                else:
+                    response_text = await response.text()
+                    print(f"Ошибка отправки подтверждения в Telegram: {response.status} - {response_text}")
+                    return False
+        
+    except Exception as e:
+        print(f"Ошибка в send_filter_confirmation_message: {e}")
+        return False
 
 
 if __name__ == "__main__":

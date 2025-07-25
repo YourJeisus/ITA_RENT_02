@@ -9,6 +9,7 @@ from src.api.deps import get_db, get_current_user
 from src.crud.crud_filter import filter as crud_filter
 from src.schemas.filter import FilterCreate, FilterUpdate, FilterResponse, Filter
 from src.db.models import User
+from src.services.telegram_bot import send_filter_confirmation_message
 
 router = APIRouter()
 
@@ -39,14 +40,29 @@ async def create_filter(
     # Для free подписки: автоматически заменяем существующий фильтр
     if current_user.subscription_type == "free":
         if len(existing_filters) >= 1:
-            # Обновляем первый существующий фильтр
-            old_filter = existing_filters[0]
-            filter_obj = crud_filter.update(
-                db=db,
-                db_obj=old_filter,
-                obj_in=filter_data
-            )
-            return filter_obj
+                         # Обновляем первый существующий фильтр
+             old_filter = existing_filters[0]
+             filter_obj = crud_filter.update(
+                 db=db,
+                 db_obj=old_filter,
+                 obj_in=filter_data
+             )
+             
+             # Отправляем подтверждение в Telegram (если привязан)
+             if current_user.telegram_chat_id:
+                 try:
+                     await send_filter_confirmation_message(
+                         current_user.telegram_chat_id,
+                         filter_obj,
+                         is_new=False
+                     )
+                 except Exception as e:
+                     # Логируем ошибку, но не прерываем обновление фильтра
+                     import logging
+                     logger = logging.getLogger(__name__)
+                     logger.error(f"Ошибка отправки подтверждения в Telegram: {e}")
+             
+             return filter_obj
     
     # Для premium подписки проверяем лимит
     elif current_user.subscription_type in ["premium_monthly", "premium_annual"] and len(existing_filters) >= 5:
@@ -61,6 +77,21 @@ async def create_filter(
         obj_in=filter_data,
         user_id=current_user.id
     )
+    
+    # Отправляем подтверждение в Telegram (если привязан)
+    if current_user.telegram_chat_id:
+        try:
+            await send_filter_confirmation_message(
+                current_user.telegram_chat_id,
+                filter_obj,
+                is_new=True
+            )
+        except Exception as e:
+            # Логируем ошибку, но не прерываем создание фильтра
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Ошибка отправки подтверждения в Telegram: {e}")
+    
     return filter_obj
 
 
