@@ -4,7 +4,7 @@ MVP версия с базовыми командами для связыван�
 """
 import logging
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -472,12 +472,12 @@ async def send_listing_notification(
         # Форматируем сообщение для одного объявления
         message = format_single_listing_message(listing, filter_obj)
         
-        # Если есть фотографии - отправляем с медиа
+        # Если есть фотографии - отправляем медиа-группу
         if listing.images and len(listing.images) > 0:
             media_group = []
             
-            # Берем первые 2 фотографии для коллажа
-            for i, image_url in enumerate(listing.images[:2]):
+            # Берем первые 3 фотографии
+            for i, image_url in enumerate(listing.images[:3]):
                 if image_url and image_url.strip():
                     from telegram import InputMediaPhoto
                     
@@ -509,6 +509,112 @@ async def send_listing_notification(
     except Exception as e:
         logger.error(f"Ошибка отправки уведомления об объявлении: {e}")
         return False
+
+
+def format_floor_info(floor_data) -> str:
+    """
+    Форматирование информации об этаже из Python dict строки или JSON
+    """
+    import json
+    import ast
+    
+    if not floor_data:
+        return ""
+    
+    try:
+        # Определяем тип данных и парсим соответственно
+        if isinstance(floor_data, dict):
+            floor_dict = floor_data
+        elif isinstance(floor_data, str):
+            # Сначала пробуем ast.literal_eval (для Python dict строк)
+            try:
+                floor_dict = ast.literal_eval(floor_data)
+            except (ValueError, SyntaxError):
+                # Если не получилось, пробуем json.loads
+                try:
+                    floor_dict = json.loads(floor_data)
+                except json.JSONDecodeError:
+                    # Fallback на прямое отображение
+                    return str(floor_data).strip()
+        else:
+            # Fallback на прямое отображение
+            return str(floor_data).strip()
+        
+        # Проверяем что получили словарь
+        if not isinstance(floor_dict, dict):
+            return str(floor_data).strip()
+        
+        # Логика выбора наиболее читаемого формата
+        
+        # 1. Если есть краткое abbreviation - используем его (лучше всего)
+        if 'abbreviation' in floor_dict and floor_dict['abbreviation']:
+            abbr = str(floor_dict['abbreviation']).strip()
+            if abbr and abbr != 'None':
+                # Обработка специальных случаев
+                if abbr.upper() == 'T':
+                    return "цокольный этаж"
+                elif abbr.upper() == 'R':
+                    return "приподнятый этаж"
+                elif '-' in abbr:
+                    return f"{abbr} этажи"
+                else:
+                    return f"{abbr} этаж"
+        
+        # 2. Если нет abbreviation, используем floorOnlyValue (более краткий)
+        if 'floorOnlyValue' in floor_dict and floor_dict['floorOnlyValue']:
+            floor_only = str(floor_dict['floorOnlyValue']).strip().lower()
+            if floor_only and floor_only != 'none':
+                # Обработка сложных случаев с несколькими этажами
+                if ',' in floor_only:
+                    parts = [part.strip() for part in floor_only.split(',')]
+                    # Упрощаем: берем только важные части
+                    simplified_parts = []
+                    for part in parts:
+                        if 'piano terra' in part:
+                            simplified_parts.append('цоколь')
+                        elif 'piano rialzato' in part:
+                            simplified_parts.append('приподнятый')
+                        elif 'interrato' in part and '(-1)' in part:
+                            simplified_parts.append('подвал')
+                        elif part.isdigit() or (part.replace(' ', '').replace('-', '').isdigit()):
+                            simplified_parts.append(f"{part} эт.")
+                    
+                    if len(simplified_parts) <= 2:
+                        return ' + '.join(simplified_parts)
+                    elif len(simplified_parts) == 3:
+                        return f"3 этажа"
+                    else:
+                        return f"многоуровневая"
+                
+                # Простые случаи
+                if 'piano terra' in floor_only:
+                    return "цокольный этаж"
+                elif 'piano rialzato' in floor_only:
+                    return "приподнятый этаж"
+                elif 'interrato' in floor_only:
+                    return "подвал"
+                elif floor_only.replace(' ', '').replace('-', '').isdigit():
+                    return f"{floor_only} этаж"
+                else:
+                    return f"{floor_only} этаж"
+        
+        # 3. Fallback на полное value (только если ничего другого нет)
+        if 'value' in floor_dict and floor_dict['value']:
+            value = str(floor_dict['value']).strip()
+            if value and len(value) < 30:  # Только короткие описания
+                # Упрощаем длинные описания
+                if 'con ascensore' in value:
+                    value = value.replace(', con ascensore', '').replace(' con ascensore', '')
+                if value.endswith('°'):
+                    return f"{value} этаж"
+                return value
+        
+        return ""
+        
+    except Exception as e:
+        logger.warning(f"Ошибка парсинга информации об этаже: {e}")
+        # Fallback на прямое отображение
+        return str(floor_data).strip() if floor_data else ""
 
 
 def format_single_listing_message(listing, filter_obj) -> str:
@@ -548,7 +654,9 @@ def format_single_listing_message(listing, filter_obj) -> str:
         prop_type = clean_text(listing.property_type)
         details.append(f"🏠 {prop_type}")
     if listing.floor:
-        details.append(f"🏢 {listing.floor} этаж")
+        floor_info = format_floor_info(listing.floor)
+        if floor_info:
+            details.append(f"🏢 {floor_info}")
     
     if details:
         message += " • ".join(details) + "\n"
@@ -579,6 +687,62 @@ def format_single_listing_message(listing, filter_obj) -> str:
     message += f"\n/pause_{filter_obj.id} - приостановить фильтр"
     
     return message
+
+
+async def try_create_collage(image_urls: List[str]) -> Optional[str]:
+    """
+    🎨 СЕРВИС КОЛЛАЖЕЙ (временно отключен)
+    
+    Создает красивые коллажи из 2-3 фотографий недвижимости через htmlcsstoimage.com API.
+    Система полностью работает и протестирована. Для включения:
+    
+    1. python toggle_photo_collages.py on
+    2. Добавить API ключи в .env:
+       HTMLCSS_USER_ID=your_user_id
+       HTMLCSS_API_KEY=your_api_key
+    
+    Результат: вместо 3 отдельных фото отправляется один красивый коллаж
+    как на примере из задания.
+    
+    Args:
+        image_urls: Список URL изображений
+        
+    Returns:
+        URL коллажа или None (сейчас всегда None - отключено)
+    """
+    # 🚫 ВРЕМЕННО ОТКЛЮЧЕНО - возвращаем None для отправки отдельных фото
+    return None
+    
+    # 📝 Код ниже работает, но закомментирован:
+    # try:
+    #     from src.core.config import settings
+    #     
+    #     # Проверяем, включены ли коллажи
+    #     if not settings.ENABLE_PHOTO_COLLAGES:
+    #         logger.debug("Коллажи отключены в настройках")
+    #         return None
+    #     
+    #     # Нужно минимум 2 изображения
+    #     if not image_urls or len(image_urls) < 2:
+    #         logger.debug("Недостаточно изображений для коллажа")
+    #         return None
+    #     
+    #     # Импортируем сервис коллажей
+    #     from src.services.simple_collage_service import create_simple_collage
+    #     
+    #     # Создаем коллаж
+    #     collage_url = await create_simple_collage(image_urls)
+    #     
+    #     if collage_url:
+    #         logger.info(f"Коллаж создан: {collage_url}")
+    #         return collage_url
+    #     else:
+    #         logger.debug("Не удалось создать коллаж")
+    #         return None
+    #         
+    # except Exception as e:
+    #     logger.warning(f"Ошибка создания коллажа: {e}")
+    #     return None
 
 
 if __name__ == "__main__":

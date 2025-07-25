@@ -43,10 +43,78 @@ class NotificationService:
         except Exception as e:
             logger.warning(f"Ошибка создания таблицы sent_notifications: {e}")
     
+    def _save_sent_notifications(self, db, user_id: int, filter_id: int, listings: List):
+        """
+        Сохраняет записи об отправленных уведомлениях с учетом режима отладки
+        """
+        from src.core.config import settings
+        debug_mode = settings.DEBUG_NOTIFICATIONS
+        
+        if debug_mode:
+            # В режиме отладки: массовое удаление всех старых записей для этого пользователя
+            try:
+                listing_ids = [listing.id for listing in listings]
+                deleted_count = db.query(SentNotification).filter(
+                    SentNotification.user_id == user_id,
+                    SentNotification.listing_id.in_(listing_ids)
+                ).delete(synchronize_session=False)
+                
+                if deleted_count > 0:
+                    logger.debug(f"🐛 [DEBUG] Удалено {deleted_count} старых записей для режима отладки")
+                    
+            except Exception as e:
+                logger.warning(f"🐛 [DEBUG] Ошибка удаления старых записей: {e}")
+        
+        # Создаем новые записи
+        for listing in listings:
+            try:
+                # Проверяем, есть ли уже такая запись (в обычном режиме)
+                if not debug_mode:
+                    existing = db.query(SentNotification).filter(
+                        SentNotification.user_id == user_id,
+                        SentNotification.listing_id == listing.id
+                    ).first()
+                    
+                    if existing:
+                        logger.debug(f"Объявление {listing.id} уже было отправлено пользователю {user_id}")
+                        continue
+                
+                # Создаем новую запись
+                sent_notification = SentNotification(
+                    user_id=user_id,
+                    filter_id=filter_id,
+                    listing_id=listing.id,
+                    notification_type="new_listing"
+                )
+                db.add(sent_notification)
+                
+            except Exception as e:
+                if debug_mode:
+                    logger.warning(f"🐛 [DEBUG] Ошибка сохранения sent_notification для listing {listing.id}: {e}")
+                else:
+                    logger.debug(f"Ошибка сохранения sent_notification для listing {listing.id}: {e}")
+    
     def should_send_notification(self, user: User, filter_obj: Filter) -> bool:
         """
         Проверка, нужно ли отправлять уведомление для этого фильтра
         """
+        from src.core.config import settings
+        
+        # Режим отладки - пропускаем все проверки времени
+        debug_mode = settings.DEBUG_NOTIFICATIONS
+        if debug_mode:
+            if not filter_obj.is_active:
+                logger.info(f"🐛 [DEBUG] Фильтр {filter_obj.id} неактивен")
+                return False
+            
+            if not user.telegram_chat_id:
+                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет telegram_chat_id")
+                return False
+            
+            logger.info(f"🐛 [DEBUG] Режим отладки - пропускаем проверку времени для фильтра {filter_obj.id}")
+            return True
+        
+        # Обычный режим
         if not filter_obj.is_active:
             logger.info(f"❌ Фильтр {filter_obj.id} неактивен")
             return False
@@ -90,11 +158,19 @@ class NotificationService:
         3. Исключаем уже отправленные объявления
         """
         try:
+            from src.core.config import settings
             db = self.get_db()
+            
+            # Проверяем режим отладки
+            debug_mode = settings.DEBUG_NOTIFICATIONS
             
             # Определяем режим работы
             is_first_run = filter_obj.last_notification_sent is None
-            logger.info(f"🚀 Фильтр {filter_obj.id}: {'первый запуск' if is_first_run else 'повторный запуск'}")
+            
+            if debug_mode:
+                logger.info(f"🐛 [DEBUG] Фильтр {filter_obj.id}: {'первый запуск' if is_first_run else 'повторный запуск'}")
+            else:
+                logger.info(f"🚀 Фильтр {filter_obj.id}: {'первый запуск' if is_first_run else 'повторный запуск'}")
             
             # Создаем параметры поиска из фильтра
             search_params = {
@@ -111,13 +187,19 @@ class NotificationService:
             # Удаляем None значения
             search_params = {k: v for k, v in search_params.items() if v is not None}
             
+            if debug_mode:
+                logger.info(f"🐛 [DEBUG] Параметры поиска: {search_params}")
+            
             # Ищем объявления напрямую через CRUD
             from src.crud.crud_listing import listing as crud_listing
             
-            if is_first_run:
-                # Первый запуск - берем до 30 самых свежих объявлений
+            if is_first_run or debug_mode:
+                # Первый запуск или режим отладки - берем до 30 самых свежих объявлений
                 all_listings = crud_listing.search(db, limit=30, **search_params)
-                logger.info(f"🔍 Первый запуск: найдено {len(all_listings)} объявлений (лимит 30)")
+                if debug_mode:
+                    logger.info(f"🐛 [DEBUG] Режим отладки: найдено {len(all_listings)} объявлений (лимит 30)")
+                else:
+                    logger.info(f"🔍 Первый запуск: найдено {len(all_listings)} объявлений (лимит 30)")
             else:
                 # Повторный запуск - только новые за 24 часа
                 since_time = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -151,13 +233,19 @@ class NotificationService:
             )
             
             # Исключаем уже отправленные объявления
-            new_listings = [
-                listing for listing in all_listings 
-                if listing.id not in sent_listing_ids
-            ]
-            
-            logger.info(f"📋 Исключено {len(all_listings) - len(new_listings)} уже отправленных объявлений")
-            logger.info(f"✅ Найдено {len(new_listings)} новых объявлений для отправки")
+            if debug_mode:
+                # В режиме отладки НЕ исключаем отправленные объявления
+                new_listings = all_listings
+                logger.info(f"🐛 [DEBUG] Режим отладки: НЕ исключаем отправленные объявления")
+                logger.info(f"🐛 [DEBUG] Всего объявлений для отправки: {len(new_listings)}")
+            else:
+                # Обычный режим - исключаем уже отправленные
+                new_listings = [
+                    listing for listing in all_listings 
+                    if listing.id not in sent_listing_ids
+                ]
+                logger.info(f"📋 Исключено {len(all_listings) - len(new_listings)} уже отправленных объявлений")
+                logger.info(f"✅ Найдено {len(new_listings)} новых объявлений для отправки")
             
             return new_listings
             
@@ -282,18 +370,7 @@ class NotificationService:
                 db.add(filter_obj)
                 
                 # Сохраняем каждое отправленное объявление в SentNotification
-                for listing in listings:
-                    try:
-                        sent_notification = SentNotification(
-                            user_id=user.id,
-                            filter_id=filter_obj.id,
-                            listing_id=listing.id,
-                            notification_type="new_listing"
-                        )
-                        db.add(sent_notification)
-                    except Exception as e:
-                        # Игнорируем ошибки дублирования (уникальный индекс)
-                        logger.debug(f"Объявление {listing.id} уже было отправлено пользователю {user.id}")
+                self._save_sent_notifications(db, user.id, filter_obj.id, listings)
                 
                 # Создаем общую запись в Notification для статистики
                 try:
@@ -330,7 +407,12 @@ class NotificationService:
         Обработка уведомлений для одного пользователя
         Возвращает количество отправленных уведомлений
         """
+        from src.core.config import settings
+        debug_mode = settings.DEBUG_NOTIFICATIONS
+        
         if not user.telegram_chat_id:
+            if debug_mode:
+                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет telegram_chat_id")
             return 0
         
         try:
@@ -338,7 +420,14 @@ class NotificationService:
             filters = crud_filter.get_by_user(self.get_db(), user_id=user.id)
             active_filters = [f for f in filters if f.is_active]
             
+            if debug_mode:
+                logger.info(f"🐛 [DEBUG] У пользователя {user.email}: всего фильтров {len(filters)}, активных {len(active_filters)}")
+                for f in filters:
+                    logger.info(f"🐛 [DEBUG] Фильтр {f.id}: '{f.name}' - {'активен' if f.is_active else 'неактивен'}")
+            
             if not active_filters:
+                if debug_mode:
+                    logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных фильтров")
                 return 0
             
             sent_count = 0
@@ -375,7 +464,19 @@ class NotificationService:
         Обработка уведомлений для всех пользователей
         Основная функция диспетчера уведомлений
         """
-        logger.info("🔔 Запуск диспетчера уведомлений...")
+        from src.core.config import settings
+        
+        # Проверяем режим отладки
+        debug_mode = settings.DEBUG_NOTIFICATIONS
+        
+        if debug_mode:
+            logger.info("🐛 [DEBUG] Запуск диспетчера уведомлений в режиме отладки...")
+            logger.info("🐛 [DEBUG] Особенности режима отладки:")
+            logger.info("🐛 [DEBUG] - Временные ограничения отключены")
+            logger.info("🐛 [DEBUG] - Отправка дубликатов разрешена")
+            logger.info("🐛 [DEBUG] - Подробное логирование")
+        else:
+            logger.info("🔔 Запуск диспетчера уведомлений...")
         
         stats = {
             "users_processed": 0,
@@ -394,12 +495,17 @@ class NotificationService:
             
             for user in users:
                 try:
+                    if debug_mode:
+                        logger.info(f"🐛 [DEBUG] Обрабатываем пользователя: {user.email} (ID: {user.id}, Chat ID: {user.telegram_chat_id})")
+                    
                     sent_count = await self.process_user_notifications(user)
                     stats["users_processed"] += 1
                     stats["notifications_sent"] += sent_count
                     
                     if sent_count > 0:
                         logger.info(f"Отправлено {sent_count} уведомлений пользователю {user.email}")
+                    elif debug_mode:
+                        logger.info(f"🐛 [DEBUG] Уведомления не отправлены пользователю {user.email}")
                     
                     # Пауза между пользователями для предотвращения rate limiting
                     await asyncio.sleep(0.5)

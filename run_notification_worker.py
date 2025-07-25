@@ -79,22 +79,40 @@ async def main():
     if not check_required_env_vars():
         sys.exit(1)
     
-    # Интервал между запусками (30 минут = 1800 секунд)
-    interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", "1800"))
+    # Проверяем режим отладки  
+    from src.core.config import settings
+    debug_mode = settings.DEBUG_NOTIFICATIONS
+    if debug_mode:
+        logger.info("🐛 РЕЖИМ ОТЛАДКИ ВКЛЮЧЕН!")
+        logger.info("   - Временные ограничения отключены")
+        logger.info("   - Короткий интервал (60 секунд)")
+        logger.info("   - Уведомления при каждом запуске")
+        interval_seconds = 60  # 1 минута для отладки
+    else:
+        # Обычный режим - интервал между запусками (30 минут = 1800 секунд)
+        interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", "1800"))
+    
     logger.info(f"⏰ Интервал уведомлений: {interval_seconds} секунд ({interval_seconds//60} минут)")
     
     # Бесконечный цикл
     iteration = 0
     while True:
         iteration += 1
-        logger.info(f"🔄 Итерация #{iteration} - запуск диспетчера уведомлений")
+        
+        if debug_mode:
+            logger.info(f"🐛 [DEBUG] Итерация #{iteration} - запуск диспетчера уведомлений")
+        else:
+            logger.info(f"🔄 Итерация #{iteration} - запуск диспетчера уведомлений")
         
         try:
             # Запускаем диспетчер уведомлений
             success = await run_notification_dispatcher()
             
             if success:
-                logger.info(f"✅ Итерация #{iteration} завершена успешно")
+                if debug_mode:
+                    logger.info(f"🐛 [DEBUG] Итерация #{iteration} завершена успешно")
+                else:
+                    logger.info(f"✅ Итерация #{iteration} завершена успешно")
             else:
                 logger.warning(f"⚠️ Итерация #{iteration} завершена с ошибками")
                 
@@ -102,7 +120,11 @@ async def main():
             logger.error(f"❌ Критическая ошибка в итерации #{iteration}: {e}")
         
         # Ожидание до следующего запуска
-        logger.info(f"⏳ Ожидание {interval_seconds} секунд до следующего запуска...")
+        if debug_mode:
+            logger.info(f"🐛 [DEBUG] Ожидание {interval_seconds} секунд до следующего запуска...")
+        else:
+            logger.info(f"⏳ Ожидание {interval_seconds} секунд до следующего запуска...")
+        
         await asyncio.sleep(interval_seconds)
 
 if __name__ == "__main__":

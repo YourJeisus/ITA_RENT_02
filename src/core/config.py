@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
     
+    # Отладка уведомлений
+    DEBUG_NOTIFICATIONS: bool = False
+    
+    # Настройки коллажей
+    ENABLE_PHOTO_COLLAGES: bool = False
+    HTMLCSS_USER_ID: str = ""
+    HTMLCSS_API_KEY: str = ""
+    
     # API настройки
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
