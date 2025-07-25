@@ -32,25 +32,30 @@ async def create_filter(
     db: Session = Depends(get_db)
 ):
     """
-    Создание нового фильтра
+    Создание нового фильтра с автоматической перезаписью для бесплатных пользователей
     """
-    # Проверяем лимиты подписки
     existing_filters = crud_filter.get_by_user(db=db, user_id=current_user.id)
     
-    # Для free подписки максимум 1 фильтр
-    if current_user.subscription_type == "free" and len(existing_filters) >= 1:
-        raise HTTPException(
-            status_code=403, 
-            detail="Превышен лимит фильтров для бесплатной подписки. Максимум 1 фильтр."
-        )
+    # Для free подписки: автоматически заменяем существующий фильтр
+    if current_user.subscription_type == "free":
+        if len(existing_filters) >= 1:
+            # Обновляем первый существующий фильтр
+            old_filter = existing_filters[0]
+            filter_obj = crud_filter.update(
+                db=db,
+                db_obj=old_filter,
+                obj_in=filter_data
+            )
+            return filter_obj
     
-    # Для premium подписки максимум 5 фильтров
-    if current_user.subscription_type in ["premium_monthly", "premium_annual"] and len(existing_filters) >= 5:
+    # Для premium подписки проверяем лимит
+    elif current_user.subscription_type in ["premium_monthly", "premium_annual"] and len(existing_filters) >= 5:
         raise HTTPException(
             status_code=403, 
             detail="Превышен лимит фильтров для премиум подписки. Максимум 5 фильтров."
         )
     
+    # Создаем новый фильтр
     filter_obj = crud_filter.create_with_owner(
         db=db,
         obj_in=filter_data,

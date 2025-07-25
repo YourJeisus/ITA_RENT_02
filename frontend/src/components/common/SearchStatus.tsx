@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { FilterState } from "../../types";
+import React, { useState, useEffect } from "react";
+import { FilterState, Filter } from "../../types";
 import { filtersService } from "../../services/filtersService";
 import { useAuthStore } from "../../store/authStore";
 
@@ -20,7 +20,32 @@ const SearchStatus: React.FC<SearchStatusProps> = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<Filter | null>(null);
+  const [loadingFilter, setLoadingFilter] = useState(false);
   const { isAuthenticated } = useAuthStore();
+
+  // Загружаем активный фильтр пользователя
+  useEffect(() => {
+    const loadActiveFilter = async () => {
+      if (!isAuthenticated) {
+        setActiveFilter(null);
+        return;
+      }
+
+      setLoadingFilter(true);
+      try {
+        const filter = await filtersService.getUserFilter();
+        setActiveFilter(filter);
+      } catch (error) {
+        console.error("Ошибка загрузки активного фильтра:", error);
+        setActiveFilter(null);
+      } finally {
+        setLoadingFilter(false);
+      }
+    };
+
+    loadActiveFilter();
+  }, [isAuthenticated]);
 
   const handleSaveFilter = async () => {
     if (!currentFilters || !isAuthenticated) return;
@@ -53,7 +78,8 @@ const SearchStatus: React.FC<SearchStatusProps> = ({
 
       console.log("Saving filter data:", filterData);
 
-      await filtersService.createFilter(filterData);
+      const newFilter = await filtersService.createFilter(filterData);
+      setActiveFilter(newFilter); // Обновляем активный фильтр
       setSaveMessage(
         "✅ Фильтр сохранен! Теперь вы будете получать уведомления о новых объявлениях."
       );
@@ -128,6 +154,37 @@ const SearchStatus: React.FC<SearchStatusProps> = ({
 
   return (
     <div>
+      {/* Отображение текущего активного фильтра */}
+      {isAuthenticated && activeFilter && !loadingFilter && (
+        <div
+          style={{
+            padding: "8px 12px",
+            backgroundColor: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "6px",
+            margin: "8px 0 16px 0",
+            fontSize: "12px",
+            color: "#475569",
+          }}
+        >
+          <div style={{ fontWeight: "500", marginBottom: "4px" }}>
+            📋 Активный фильтр: "{activeFilter.name}"
+          </div>
+          <div style={{ opacity: 0.8 }}>
+            {activeFilter.city && `📍 Город: ${activeFilter.city}`}
+            {activeFilter.min_price && ` • 💰 От: ${activeFilter.min_price}€`}
+            {activeFilter.max_price && ` • До: ${activeFilter.max_price}€`}
+            {activeFilter.min_rooms &&
+              ` • 🚪 Комнат: от ${activeFilter.min_rooms}`}
+            {activeFilter.max_rooms &&
+              activeFilter.min_rooms !== activeFilter.max_rooms &&
+              ` до ${activeFilter.max_rooms}`}
+            {activeFilter.property_type &&
+              ` • 🏠 Тип: ${activeFilter.property_type}`}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           padding: "12px 16px",
