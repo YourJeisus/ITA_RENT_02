@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from src.core.config import settings
 from src.db.database import get_db
 from src.crud.crud_user import get_user_by_email, link_telegram, get_by_telegram_chat_id
-from src.crud.crud_filter import get_user_filters, get_filter_by_id
+from src.crud.crud_filter import filter as crud_filter
 from src.schemas.user import UserTelegramLink
 
 # Настройка логирования
@@ -197,7 +197,7 @@ class TelegramBotService:
             return
         
         # Получаем информацию о фильтрах
-        filters = get_user_filters(self.get_db(), user_id=user.id)
+        filters = crud_filter.get_by_user(self.get_db(), user_id=user.id)
         active_filters = [f for f in filters if f.is_active]
         
         # Определяем лимиты подписки
@@ -246,7 +246,7 @@ class TelegramBotService:
             )
             return
         
-        filters = get_user_filters(self.get_db(), user_id=user.id)
+        filters = crud_filter.get_by_user(self.get_db(), user_id=user.id)
         
         if not filters:
             await update.message.reply_text(
@@ -300,7 +300,7 @@ class TelegramBotService:
                     await update.message.reply_text("❌ Аккаунт не привязан.")
                     return
                 
-                filter_obj = get_filter_by_id(self.get_db(), filter_id=filter_id)
+                filter_obj = crud_filter.get(self.get_db(), id=filter_id)
                 
                 if not filter_obj or filter_obj.user_id != user.id:
                     await update.message.reply_text("❌ Фильтр не найден.")

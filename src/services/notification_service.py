@@ -13,7 +13,7 @@ from src.core.config import settings
 from src.db.database import get_db
 from src.db.models import User, Filter, Listing, Notification
 # from src.crud.crud_user import get_all_active_users  # Не используется в MVP
-from src.crud.crud_filter import get_user_filters
+from src.crud.crud_filter import filter as crud_filter
 from src.crud.crud_listing import search_listings
 from src.services.telegram_bot import send_notification_to_user
 
@@ -208,7 +208,7 @@ class NotificationService:
         
         try:
             # Получаем активные фильтры пользователя
-            filters = get_user_filters(self.get_db(), user_id=user.id)
+            filters = crud_filter.get_by_user(self.get_db(), user_id=user.id)
             active_filters = [f for f in filters if f.is_active]
             
             if not active_filters:

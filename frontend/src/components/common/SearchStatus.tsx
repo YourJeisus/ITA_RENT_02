@@ -51,7 +51,9 @@ const SearchStatus: React.FC<SearchStatusProps> = ({
         max_area: currentFilters.areaMax,
       };
 
-      await filtersService.createOrUpdateUserFilter(filterData);
+      console.log("Saving filter data:", filterData);
+
+      await filtersService.createFilter(filterData);
       setSaveMessage(
         "✅ Фильтр сохранен! Теперь вы будете получать уведомления о новых объявлениях."
       );
