@@ -82,12 +82,16 @@ async def main():
     # Проверяем режим отладки  
     from src.core.config import settings
     debug_mode = settings.DEBUG_NOTIFICATIONS
+    
+    # Получаем интервал из переменной окружения
     if debug_mode:
+        # В режиме отладки используем переменную или 300 секунд (5 минут) по умолчанию
+        default_interval = 300
+        interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", str(default_interval)))
         logger.info("🐛 РЕЖИМ ОТЛАДКИ ВКЛЮЧЕН!")
         logger.info("   - Временные ограничения отключены")
-        logger.info("   - Короткий интервал (60 секунд)")
         logger.info("   - Уведомления при каждом запуске")
-        interval_seconds = 60  # 1 минута для отладки
+        logger.info(f"   - Интервал: {interval_seconds} секунд")
     else:
         # Обычный режим - интервал между запусками (30 минут = 1800 секунд)
         interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", "1800"))
