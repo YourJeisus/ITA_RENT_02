@@ -61,9 +61,12 @@ class ScraperWorker:
             logger.error(f"❌ Ошибка создания таблиц БД: {e}")
             raise
             
-    async def run_scraping_cycle(self) -> bool:
+    async def run_scraping_cycle(self, show_next_run: bool = True) -> bool:
         """
         Запуск одного цикла парсинга
+        
+        Args:
+            show_next_run: Показывать ли время до следующего запуска
         
         Returns:
             bool: True если парсинг прошел успешно
@@ -93,6 +96,12 @@ class ScraperWorker:
                     logger.info(f"   📋 Спаршено: {result['scraped_count']} объявлений")
                     logger.info(f"   💾 Сохранено: {result['saved_count']} объявлений")
                     logger.info(f"   ⏱️ Время: {result['elapsed_time']:.2f} сек")
+                    
+                    # Показываем время до следующего запуска
+                    if show_next_run:
+                        next_run = datetime.now() + timedelta(hours=self.interval_hours)
+                        logger.info(f"⏰ Следующий запуск: {next_run.strftime('%H:%M %d.%m.%Y')} (через {self.interval_hours}ч)")
+                    
                     return True
                 else:
                     logger.error(f"❌ Парсинг завершился с ошибкой: {result['message']}")
@@ -123,15 +132,11 @@ class ScraperWorker:
         
         # Запускаем первый цикл сразу
         logger.info("🚀 Запускаем первый цикл парсинга сразу...")
-        await self.run_scraping_cycle()
+        await self.run_scraping_cycle(show_next_run=True)
         
         # Основной цикл с таймером
         while self.is_running:
             try:
-                # Ждем до следующего цикла
-                next_run = datetime.now() + timedelta(hours=self.interval_hours)
-                logger.info(f"😴 Следующий запуск: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-                
                 # Спим по частям, чтобы можно было прервать
                 sleep_seconds = self.interval_hours * 3600
                 for _ in range(sleep_seconds):
@@ -145,7 +150,7 @@ class ScraperWorker:
                     
                 # Запускаем очередной цикл парсинга
                 logger.info(f"⏰ Время для нового цикла парсинга!")
-                await self.run_scraping_cycle()
+                await self.run_scraping_cycle(show_next_run=True)
                 
             except Exception as e:
                 logger.error(f"❌ Ошибка в основном цикле воркера: {e}")
