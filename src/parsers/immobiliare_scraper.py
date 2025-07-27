@@ -105,7 +105,7 @@ class ImmobiliareScraper:
                             status = job_data.get("status")
                             status_url = job_data.get("statusUrl")
                             
-                            logger.info(f"📤 Job {job_id} создан для страницы {page_num}")
+                            logger.debug(f"📤 Job {job_id} создан для страницы {page_num}")
                             return {
                                 "id": job_id,
                                 "status": status,
@@ -166,7 +166,7 @@ class ImmobiliareScraper:
                             status = job_status.get("status")
                             
                             if status == "finished":
-                                logger.info(f"✅ Job {job_id} (страница {page_num}) завершен за {elapsed:.1f}s")
+                                logger.debug(f"✅ Job {job_id} (страница {page_num}) завершен за {elapsed:.1f}s")
                                 return job_status
                             
                             elif status == "failed":
@@ -320,7 +320,7 @@ class ImmobiliareScraper:
                         self.seen_listing_ids.add(listing_id)
                         page_listings.append(parsed_listing)
             
-            logger.info(f"✅ Страница {page_num}: {len(page_listings)}/{len(results)} уникальных")
+            logger.debug(f"✅ Страница {page_num}: {len(page_listings)}/{len(results)} уникальных")
             return page_listings
             
         except Exception as e:
@@ -418,10 +418,7 @@ class ImmobiliareScraper:
         """
         ОСНОВНОЙ МЕТОД: Скрапит несколько страниц асинхронно
         """
-        logger.info(f"🚀 НАЧИНАЕМ АСИНХРОННЫЙ СКРАПИНГ V2")
-        logger.info(f"🎯 URL: {self.search_url}")
-        logger.info(f"📄 Максимум страниц: {max_pages}")
-        logger.info(f"⚡ Режим: ScraperAPI Async + Sync fallback")
+        logger.info(f"🚀 Запуск парсинга {max_pages} страниц...")
         
         start_time = time.time()
         
@@ -466,7 +463,7 @@ class ImmobiliareScraper:
         
         elapsed_time = time.time() - start_time
         
-        logger.info(f"🎉 Скрапинг завершен за {elapsed_time:.1f}с: {len(all_listings)} объявлений, {successful_pages}/{max_pages} страниц")
+        logger.info(f"✅ Парсинг завершен: {len(all_listings)} объявлений за {elapsed_time:.1f}с")
         
         return all_listings
     

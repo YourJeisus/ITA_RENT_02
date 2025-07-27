@@ -37,12 +37,7 @@ async def main():
     """
     Основная функция запуска парсинга
     """
-    print("🚀 ЗАПУСК ПАРСИНГА IMMOBILIARE.IT")
-    print("=" * 60)
-    print("🎯 Цель: https://www.immobiliare.it/affitto-case/roma/")
-    print("📋 Задача: Спарсить ВСЕ объявления и ВСЕ фотографии")
-    print("💾 Результат: Сохранить в базу данных")
-    print("=" * 60)
+    print("🚀 Парсинг Immobiliare.it (Рим)")
     
     # Геокодирование включено по умолчанию
     import sys
@@ -50,12 +45,6 @@ async def main():
     
     if len(sys.argv) > 1 and sys.argv[1] == "--no-geo":
         enable_geocoding = False
-        print("🚀 РЕЖИМ: БЕЗ ГЕОКОДИРОВАНИЯ (ускорение ~4%)")
-    else:
-        print("🗺️  РЕЖИМ: С ГЕОКОДИРОВАНИЕМ (полные данные, рекомендуется)")
-    
-    print("💡 Для ускорения на 4%: python run_scraping.py --no-geo")
-    print("=" * 60)
     
     # Инициализируем скрапер с выбранными настройками
     scraper = ImmobiliareScraper(enable_geocoding=enable_geocoding)
@@ -65,15 +54,9 @@ async def main():
     from src.core.config import settings
     if not settings.SCRAPERAPI_KEY:
         print("❌ ОШИБКА: SCRAPERAPI_KEY не настроен!")
-        print("💡 Добавьте SCRAPERAPI_KEY в файл .env")
         return
     
-    print(f"✅ ScraperAPI ключ настроен")
-    
     try:
-        # Запускаем парсинг (максимум 10 страниц)
-        print(f"\n🔄 НАЧИНАЕМ АСИНХРОННЫЙ ПАРСИНГ...")
-        print(f"⚡ Все {10} страниц будут обрабатываться параллельно!")
         
         import time
         start_time = time.time()
@@ -87,13 +70,18 @@ async def main():
             print("❌ Объявления не найдены!")
             return
         
-        print(f"\n🎉 Парсинг завершен за {execution_time:.1f}с: {len(listings)} объявлений")
-        
         # Сохраняем в базу данных
         db = SessionLocal()
         try:
             saved_stats = scraping_service.save_listings_to_db(listings, db)
+            
+            # Краткая сводка с таймером
+            from datetime import datetime, timedelta
+            next_run = datetime.now() + timedelta(hours=1)
+            
+            print(f"✅ Парсинг завершен: {len(listings)} объявлений за {execution_time:.1f}с")
             print(f"💾 Сохранено: {saved_stats['created']} новых, {saved_stats['updated']} обновлено")
+            print(f"⏰ Следующий запуск: {next_run.strftime('%H:%M %d.%m.%Y')} (через 1ч)")
             
         finally:
             db.close()

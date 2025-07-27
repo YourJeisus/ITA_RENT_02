@@ -122,7 +122,7 @@ class ScrapingService:
             
         stats = {"created": 0, "updated": 0, "errors": 0}
         
-        logger.info(f"💾 Сохраняем {len(listings)} объявлений в базу данных...")
+        logger.debug(f"💾 Сохраняем {len(listings)} объявлений в базу данных...")
         
         for listing_data in listings:
             try:
@@ -175,10 +175,7 @@ class ScrapingService:
                 stats["errors"] += 1
                 continue
         
-        logger.info(f"📊 Результаты сохранения:")
-        logger.info(f"   ✅ Новых объявлений: {stats['created']}")
-        logger.info(f"   🔄 Обновленных: {stats['updated']}")
-        logger.info(f"   ❌ Ошибок: {stats['errors']}")
+        logger.debug(f"💾 Сохранено: {stats['created']} новых, {stats['updated']} обновлено, {stats['errors']} ошибок")
         
         return stats
     
