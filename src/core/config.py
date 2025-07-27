@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
+    
+    # Scraper Worker настройки
+    SCRAPER_WORKER_INTERVAL_HOURS: int = 6  # Запуск каждые 6 часов
+    SCRAPER_WORKER_MAX_PAGES: int = 10  # Максимум страниц за цикл
     TELEGRAM_WEBHOOK_URL: str = ""
     
     # Stripe платежи

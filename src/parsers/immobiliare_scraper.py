@@ -89,8 +89,6 @@ class ImmobiliareScraper:
         timeout = aiohttp.ClientTimeout(total=self.job_submit_timeout)
         
         try:
-            logger.info(f"📤 Отправляем async job для страницы {page_num}: {url}")
-            
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     self.async_jobs_url,
@@ -107,7 +105,7 @@ class ImmobiliareScraper:
                             status = job_data.get("status")
                             status_url = job_data.get("statusUrl")
                             
-                            logger.info(f"✅ Job создан: {job_id}, статус: {status}")
+                            logger.info(f"📤 Job {job_id} создан для страницы {page_num}")
                             return {
                                 "id": job_id,
                                 "status": status,
@@ -117,14 +115,13 @@ class ImmobiliareScraper:
                             }
                         except json.JSONDecodeError as e:
                             logger.error(f"❌ Ошибка парсинга JSON ответа: {e}")
-                            logger.debug(f"Ответ: {response_text[:500]}")
                             return None
                     else:
-                        logger.error(f"❌ HTTP ошибка {response.status}: {response_text[:200]}")
+                        logger.error(f"❌ HTTP ошибка {response.status} для страницы {page_num}")
                         return None
                         
         except Exception as e:
-            logger.error(f"❌ Исключение при создании job: {e}")
+            logger.error(f"❌ Исключение при создании job для страницы {page_num}: {e}")
             return None
     
     async def poll_job_status(self, job_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -151,12 +148,10 @@ class ImmobiliareScraper:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 while time.time() - start_time < self.job_poll_timeout:
                     elapsed = time.time() - start_time
-                    logger.info(f"🔄 Опрашиваем job {job_id} (страница {page_num}) - {elapsed:.1f}s")
                     
                     try:
                         async with session.get(status_url) as response:
                             if response.status != 200:
-                                logger.warning(f"⚠️ HTTP {response.status} при опросе job {job_id}")
                                 await asyncio.sleep(poll_interval)
                                 continue
                             
@@ -165,14 +160,13 @@ class ImmobiliareScraper:
                             try:
                                 job_status = json.loads(response_text)
                             except json.JSONDecodeError:
-                                logger.warning(f"⚠️ Не удалось распарсить JSON для job {job_id}")
                                 await asyncio.sleep(poll_interval)
                                 continue
                             
                             status = job_status.get("status")
                             
                             if status == "finished":
-                                logger.info(f"✅ Job {job_id} завершен успешно!")
+                                logger.info(f"✅ Job {job_id} (страница {page_num}) завершен за {elapsed:.1f}s")
                                 return job_status
                             
                             elif status == "failed":
@@ -180,29 +174,34 @@ class ImmobiliareScraper:
                                 logger.error(f"❌ Job {job_id} провалился: {fail_reason}")
                                 return None
                             
-                            elif status in ["running", "pending"]:
-                                logger.info(f"⏳ Job {job_id} выполняется... ждем {poll_interval}s")
+                            elif status in ["queued", "running"]:
+                                # Просто ждем без лишних логов
                                 await asyncio.sleep(poll_interval)
-                                # Экспоненциальное увеличение интервала
+                                # Постепенно увеличиваем интервал
                                 poll_interval = min(poll_interval * 1.2, max_poll_interval)
+                                continue
                             
                             else:
-                                logger.warning(f"⚠️ Неизвестный статус для job {job_id}: {status}")
+                                logger.warning(f"⚠️ Неизвестный статус {status} для job {job_id}")
                                 await asyncio.sleep(poll_interval)
+                                continue
                     
                     except asyncio.TimeoutError:
-                        logger.warning(f"⏰ Таймаут при опросе job {job_id}")
+                        logger.warning(f"⚠️ Таймаут при опросе job {job_id}")
                         await asyncio.sleep(poll_interval)
+                        continue
                     
                     except Exception as e:
                         logger.warning(f"⚠️ Ошибка при опросе job {job_id}: {e}")
                         await asyncio.sleep(poll_interval)
+                        continue
                 
+                # Превышен общий таймаут
                 logger.error(f"⏰ Превышено время ожидания для job {job_id}")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Критическая ошибка опроса job {job_id}: {e}")
+            logger.error(f"❌ Критическая ошибка при опросе job {job_id}: {e}")
             return None
     
     async def scrape_page_sync_fallback(self, page_num: int) -> Optional[str]:
@@ -310,8 +309,6 @@ class ImmobiliareScraper:
                 logger.info(f"🔚 Пустая страница {page_num}")
                 return []
             
-            logger.info(f"📋 Найдено {len(results)} объявлений на странице {page_num}")
-            
             # Парсим каждое объявление
             page_listings = []
             for listing_json in results:
@@ -322,11 +319,8 @@ class ImmobiliareScraper:
                     if listing_id and listing_id not in self.seen_listing_ids:
                         self.seen_listing_ids.add(listing_id)
                         page_listings.append(parsed_listing)
-                        logger.debug(f"✅ Добавлено объявление {listing_id}")
-                    elif listing_id:
-                        logger.debug(f"🔄 Дубликат объявления {listing_id}")
             
-            logger.info(f"✅ Страница {page_num}: {len(page_listings)} уникальных объявлений")
+            logger.info(f"✅ Страница {page_num}: {len(page_listings)}/{len(results)} уникальных")
             return page_listings
             
         except Exception as e:
@@ -473,24 +467,7 @@ class ImmobiliareScraper:
         
         elapsed_time = time.time() - start_time
         
-        logger.info(f"🎉 АСИНХРОННЫЙ СКРАПИНГ V2 ЗАВЕРШЕН!")
-        logger.info(f"📊 Статистика:")
-        logger.info(f"   ⏱️ Время выполнения: {elapsed_time:.1f}с")
-        logger.info(f"   ✅ Успешных страниц: {successful_pages}/{max_pages}")
-        logger.info(f"   ❌ Ошибок: {error_pages}")
-        logger.info(f"   📋 Всего объявлений: {len(all_listings)}")
-        logger.info(f"   🔄 Уникальных ID в кеше: {len(self.seen_listing_ids)}")
-        
-        # Статистика по фотографиям
-        if all_listings:
-            photo_counts = [len(listing.get('images', [])) for listing in all_listings]
-            avg_photos = sum(photo_counts) / len(photo_counts)
-            logger.info(f"   📸 Среднее количество фото: {avg_photos:.1f}")
-            
-            # Статистика по координатам
-            with_coords = sum(1 for listing in all_listings if listing.get('latitude') and listing.get('longitude'))
-            coord_percentage = (with_coords / len(all_listings)) * 100
-            logger.info(f"   🗺️ С координатами: {with_coords}/{len(all_listings)} ({coord_percentage:.1f}%)")
+        logger.info(f"🎉 Скрапинг завершен за {elapsed_time:.1f}с: {len(all_listings)} объявлений, {successful_pages}/{max_pages} страниц")
         
         return all_listings
     

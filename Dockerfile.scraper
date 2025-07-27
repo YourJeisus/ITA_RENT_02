@@ -27,13 +27,13 @@ ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Создание скрипта для health check
-RUN echo '#!/bin/bash\necho "Scraper worker is running"' > /app/health_check.sh \
+# Создание простого health check
+RUN echo '#!/bin/bash\necho "healthy"' > /app/health_check.sh \
     && chmod +x /app/health_check.sh
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD /app/health_check.sh
+# Health check (отключаем пока что)
+# HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+#     CMD /app/health_check.sh
 
 USER app
 

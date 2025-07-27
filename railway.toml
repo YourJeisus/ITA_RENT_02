@@ -35,8 +35,6 @@ build.builder = "dockerfile"
 build.dockerfilePath = "Dockerfile.scraper"
 
 [services.scraper-worker.deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 300
 restartPolicyType = "always"
 
 [services.scraper-worker.env]
