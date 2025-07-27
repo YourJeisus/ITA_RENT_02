@@ -453,15 +453,14 @@ class ImmobiliareScraper:
         
         for page_num, result in enumerate(results, 1):
             if isinstance(result, Exception):
-                logger.error(f"❌ Исключение на странице {page_num}: {result}")
+                logger.error(f"❌ Ошибка на странице {page_num}: {result}")
                 error_pages += 1
             elif isinstance(result, list):
                 all_listings.extend(result)
                 if result:
                     successful_pages += 1
-                    logger.info(f"✅ Страница {page_num}: {len(result)} объявлений")
                 else:
-                    logger.info(f"🔚 Страница {page_num}: пустая")
+                    logger.debug(f"🔚 Страница {page_num}: пустая")
             else:
                 logger.warning(f"⚠️ Неожиданный результат для страницы {page_num}: {type(result)}")
         

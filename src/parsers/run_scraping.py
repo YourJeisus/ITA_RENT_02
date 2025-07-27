@@ -87,54 +87,16 @@ async def main():
             print("❌ Объявления не найдены!")
             return
         
-        print(f"\n📊 РЕЗУЛЬТАТЫ АСИНХРОННОГО ПАРСИНГА:")
-        print(f"   📋 Всего объявлений: {len(listings)}")
-        print(f"   ⏱️  Время выполнения: {execution_time:.2f} секунд")
-        print(f"   ⚡ Скорость: {len(listings)/execution_time:.2f} объявлений/сек")
-        
-        # Статистика по фотографиям
-        total_photos = sum(len(listing.get('images', [])) for listing in listings)
-        listings_with_photos = sum(1 for listing in listings if listing.get('images'))
-        
-        print(f"   📸 Всего фотографий: {total_photos}")
-        print(f"   🖼️  Объявлений с фото: {listings_with_photos}/{len(listings)}")
-        print(f"   📷 Среднее фото на объявление: {total_photos/len(listings):.1f}")
-        
-        # Статистика по координатам
-        with_coords = sum(1 for listing in listings if listing.get('latitude') and listing.get('longitude'))
-        print(f"   🗺️  С координатами: {with_coords}/{len(listings)}")
+        print(f"\n🎉 Парсинг завершен за {execution_time:.1f}с: {len(listings)} объявлений")
         
         # Сохраняем в базу данных
-        print(f"\n💾 СОХРАНЕНИЕ В БАЗУ ДАННЫХ...")
-        
         db = SessionLocal()
         try:
             saved_stats = scraping_service.save_listings_to_db(listings, db)
-            
-            print(f"✅ СОХРАНЕНИЕ ЗАВЕРШЕНО:")
-            print(f"   ➕ Создано новых: {saved_stats['created']}")
-            print(f"   🔄 Обновлено: {saved_stats['updated']}")
-            print(f"   ❌ Ошибок: {saved_stats['errors']}")
+            print(f"💾 Сохранено: {saved_stats['created']} новых, {saved_stats['updated']} обновлено")
             
         finally:
             db.close()
-        
-        # Показываем примеры объявлений
-        print(f"\n🏠 ПРИМЕРЫ ОБЪЯВЛЕНИЙ:")
-        print("-" * 60)
-        
-        for i, listing in enumerate(listings[:3], 1):
-            print(f"{i}. {listing.get('title', 'Без названия')[:50]}...")
-            print(f"   🆔 ID: {listing.get('external_id', 'N/A')}")
-            print(f"   💰 Цена: {listing.get('price', 'N/A')}€/месяц")
-            print(f"   📐 Площадь: {listing.get('area', 'N/A')} м²")
-            print(f"   🚪 Комнат: {listing.get('rooms', 'N/A')}")
-            print(f"   📸 Фото: {len(listing.get('images', []))} шт.")
-            print(f"   🗺️  Координаты: {'✅' if listing.get('latitude') else '❌'}")
-            print(f"   🔗 URL: {listing.get('url', 'N/A')}")
-            print()
-        
-        print("🎉 ПАРСИНГ УСПЕШНО ЗАВЕРШЕН!")
         
     except Exception as e:
         logger.error(f"❌ Ошибка при парсинге: {e}")
