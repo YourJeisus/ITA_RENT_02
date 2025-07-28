@@ -27,20 +27,15 @@ restartPolicyType = "always"
 
 # ENV переменные уже настроены в Dockerfile.railway
 
-# Новый сервис для автоматического парсинга каждые 6 часов
-[[services]]
-name = "scraper-worker"
-source = "."
-build.builder = "dockerfile"
-build.dockerfilePath = "Dockerfile.scraper"
+# Автоматический парсинг всех источников через Cron Jobs
+[[crons]]
+cmd = "python cron_all_scrapers.py"
+schedule = "0 */2 * * *"  # Каждые 2 часа
 
-[services.scraper-worker.deploy]
-restartPolicyType = "always"
-
-[services.scraper-worker.env]
-PYTHONPATH = "/app"
-ENVIRONMENT = "production"
-WORKER_TYPE = "scraper"
+# Диспетчер уведомлений через Cron Jobs  
+[[crons]]
+cmd = "python cron_notifications.py"
+schedule = "*/15 * * * *"  # Каждые 15 минут
 
 # Telegram бот сервис
 [[services]]

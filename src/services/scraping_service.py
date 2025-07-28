@@ -179,6 +179,57 @@ class ScrapingService:
         
         return stats
     
+    def save_listing(self, db: Session, listing_data: Dict[str, Any]) -> str:
+        """
+        Сохраняет одно объявление в базу данных
+        
+        Args:
+            db: Сессия базы данных
+            listing_data: Данные объявления
+            
+        Returns:
+            str: "created", "updated" или "error"
+        """
+        try:
+            # Проверяем, существует ли уже такое объявление
+            external_id = listing_data.get('external_id')
+            source = listing_data.get('source', 'immobiliare')
+            
+            if not external_id:
+                logger.warning("⚠️ Объявление без external_id, пропускаем")
+                return "error"
+            
+            existing = crud_listing.get_by_external_id(
+                db=db,
+                external_id=external_id,
+                source=source
+            )
+            
+            if existing:
+                # Обновляем существующее объявление
+                listing_update = ListingCreate(**listing_data)
+                crud_listing.update(db=db, db_obj=existing, obj_in=listing_update)
+                logger.debug(f"🔄 Обновлено объявление {external_id}")
+                return "updated"
+            else:
+                # Создаем новое объявление
+                listing_create = ListingCreate(**listing_data)
+                crud_listing.create(db=db, obj_in=listing_create)
+                logger.debug(f"✅ Создано объявление {external_id}")
+                return "created"
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения объявления {external_id}: {e}")
+            
+            # Принудительный rollback сессии при ошибках
+            try:
+                db.rollback()
+                logger.debug("🔄 Сессия БД откатана")
+            except Exception as rollback_error:
+                logger.error(f"❌ Ошибка rollback: {rollback_error}")
+            
+            return "error"
+    
     async def scrape_and_save(
         self,
         filters: Dict[str, Any],
