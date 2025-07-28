@@ -1,0 +1,9 @@
+{
+  "cron": [
+    {
+      "schedule": "0 * * * *",
+      "command": "python cron_scraper.py",
+      "name": "Scrape Immobiliare every hour"
+    }
+  ]
+}
