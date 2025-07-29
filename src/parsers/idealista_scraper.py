@@ -385,12 +385,32 @@ class IdealistaScraper:
                 if area_match:
                     area = int(area_match.group(1))
             
-            # Количество комнат
+            # Количество комнат - улучшенный парсинг
             rooms = None
+            
+            # Метод 1: Поиск по содержимому текста
             rooms_elem = container.find('span', string=re.compile(r'locale|stanz|camer')) or \
                         container.find('div', string=re.compile(r'locale|stanz|camer'))
             
-            if rooms_elem:
+            if not rooms_elem:
+                # Метод 2: Поиск в заголовке (bilocale, trilocale, etc.)
+                title_lower = title.lower()
+                if 'monolocale' in title_lower or 'mono' in title_lower:
+                    rooms = 1
+                elif 'bilocale' in title_lower or 'bilo' in title_lower:
+                    rooms = 2
+                elif 'trilocale' in title_lower or 'trilo' in title_lower:
+                    rooms = 3
+                elif 'quadrilocale' in title_lower:
+                    rooms = 4
+                else:
+                    # Метод 3: Поиск паттернов "X локали" или "X комнат"
+                    rooms_match = re.search(r'(\d+)\s*(?:local|stanz|camer|room)', title_lower)
+                    if rooms_match:
+                        rooms = int(rooms_match.group(1))
+            
+            if rooms_elem and not rooms:
+                # Парсинг из найденного элемента
                 rooms_text = rooms_elem.get_text(strip=True)
                 rooms_match = re.search(r'(\d+)', rooms_text)
                 if rooms_match:
@@ -432,6 +452,7 @@ class IdealistaScraper:
                 'source': 'idealista',
                 'title': title,
                 'price': price,
+                'property_type': 'apartment',  # Добавляем property_type для фильтрации
                 'area': area,
                 'rooms': rooms,
                 'address': address,
