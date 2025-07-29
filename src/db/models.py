@@ -146,7 +146,7 @@ class Listing(Base):
     # Основная информация об объявлении
     external_id: Mapped[str] = mapped_column(String(255), index=True)  # ID на сайте-источнике
     source: Mapped[str] = mapped_column(String(50), index=True)  # idealista, immobiliare, subito
-    url: Mapped[str] = mapped_column(Text, unique=True)  # Убираем ограничение на URL
+    url: Mapped[str] = mapped_column(Text)  # Убираем unique constraint - может дублироваться между источниками
     
     # Контент объявления
     title: Mapped[str] = mapped_column(Text)  # Убираем ограничение на заголовок

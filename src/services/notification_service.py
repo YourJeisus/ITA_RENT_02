@@ -196,10 +196,19 @@ class NotificationService:
             if is_first_run or debug_mode:
                 # Первый запуск или режим отладки - берем до 30 самых свежих объявлений
                 all_listings = crud_listing.search(db, limit=30, **search_params)
+                
+                # Подсчитываем по источникам
+                source_stats = {}
+                for listing in all_listings:
+                    source = listing.source or 'unknown'
+                    source_stats[source] = source_stats.get(source, 0) + 1
+                
                 if debug_mode:
                     logger.info(f"🐛 [DEBUG] Режим отладки: найдено {len(all_listings)} объявлений (лимит 30)")
+                    logger.info(f"🐛 [DEBUG] По источникам: {source_stats}")
                 else:
                     logger.info(f"🔍 Первый запуск: найдено {len(all_listings)} объявлений (лимит 30)")
+                    logger.info(f"📊 По источникам: {source_stats}")
             else:
                 # Повторный запуск - только новые за 24 часа
                 since_time = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -220,9 +229,17 @@ class NotificationService:
                         
                         if listing_time >= compare_time:
                             fresh_listings.append(listing)
-                
+
                 all_listings = fresh_listings
+                
+                # Подсчитываем по источникам
+                source_stats = {}
+                for listing in all_listings:
+                    source = listing.source or 'unknown'
+                    source_stats[source] = source_stats.get(source, 0) + 1
+                
                 logger.info(f"🔍 Повторный запуск: найдено {len(all_listings)} новых объявлений за 24ч")
+                logger.info(f"📊 По источникам: {source_stats}")
             
             # Получаем список уже отправленных объявлений для этого пользователя
             sent_listing_ids = set(
@@ -238,6 +255,14 @@ class NotificationService:
                 new_listings = all_listings
                 logger.info(f"🐛 [DEBUG] Режим отладки: НЕ исключаем отправленные объявления")
                 logger.info(f"🐛 [DEBUG] Всего объявлений для отправки: {len(new_listings)}")
+                
+                # Дополнительная статистика в режиме отладки
+                if new_listings:
+                    new_source_stats = {}
+                    for listing in new_listings:
+                        source = listing.source or 'unknown'
+                        new_source_stats[source] = new_source_stats.get(source, 0) + 1
+                    logger.info(f"🐛 [DEBUG] К отправке по источникам: {new_source_stats}")
             else:
                 # Обычный режим - исключаем уже отправленные
                 new_listings = [
@@ -246,6 +271,14 @@ class NotificationService:
                 ]
                 logger.info(f"📋 Исключено {len(all_listings) - len(new_listings)} уже отправленных объявлений")
                 logger.info(f"✅ Найдено {len(new_listings)} новых объявлений для отправки")
+                
+                # Статистика финальных объявлений по источникам
+                if new_listings:
+                    final_source_stats = {}
+                    for listing in new_listings:
+                        source = listing.source or 'unknown'
+                        final_source_stats[source] = final_source_stats.get(source, 0) + 1
+                    logger.info(f"📊 К отправке по источникам: {final_source_stats}")
             
             return new_listings
             
@@ -415,6 +448,8 @@ class NotificationService:
                 logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет telegram_chat_id")
             return 0
         
+        sent_count = 0  # Инициализируем счетчик
+        
         try:
             # Получаем активные фильтры пользователя
             filters = crud_filter.get_by_user(self.get_db(), user_id=user.id)
@@ -430,25 +465,35 @@ class NotificationService:
                     logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных фильтров")
                 return 0
             
-            sent_count = 0
-            
             for filter_obj in active_filters:
                 # Проверяем, нужно ли отправлять уведомление
                 if not self.should_send_notification(user, filter_obj):
-                    logger.info(f"⏰ Пропускаем фильтр {filter_obj.id} - слишком рано для следующего уведомления")
+                    if debug_mode:
+                        logger.info(f"🐛 [DEBUG] Пропускаем фильтр {filter_obj.id} - слишком рано для следующего уведомления")
+                    else:
+                        logger.info(f"⏰ Пропускаем фильтр {filter_obj.id} - слишком рано для следующего уведомления")
                     continue
                 
                 # Получаем новые объявления
                 new_listings = self.get_new_listings_for_filter(filter_obj, user.id)
                 
                 if not new_listings:
+                    if debug_mode:
+                        logger.info(f"🐛 [DEBUG] Для фильтра {filter_obj.id} '{filter_obj.name}' новых объявлений не найдено")
                     continue
+                
+                if debug_mode:
+                    logger.info(f"🐛 [DEBUG] Для фильтра {filter_obj.id} '{filter_obj.name}' найдено {len(new_listings)} новых объявлений")
+                    for listing in new_listings[:3]:  # Показываем первые 3
+                        logger.info(f"🐛 [DEBUG]   - {listing.title[:50]}... (ID: {listing.id}, источник: {listing.source})")
                 
                 # Отправляем уведомление
                 success = await self.send_notification_for_filter(user, filter_obj, new_listings)
                 
                 if success:
                     sent_count += 1
+                    if debug_mode:
+                        logger.info(f"🐛 [DEBUG] Уведомление для фильтра {filter_obj.id} отправлено успешно")
                 
                 # Небольшая пауза между уведомлениями
                 await asyncio.sleep(1)
@@ -457,7 +502,7 @@ class NotificationService:
             
         except Exception as e:
             logger.error(f"Ошибка обработки уведомлений для пользователя {user.email}: {e}")
-            return 0
+            return sent_count
     
     async def process_all_notifications(self) -> Dict[str, int]:
         """

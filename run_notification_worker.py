@@ -61,7 +61,25 @@ async def run_notification_dispatcher():
         from src.services.notification_service import run_notification_dispatcher
         
         result = await run_notification_dispatcher()
-        logger.info(f"✅ Диспетчер завершен. Результат: {result}")
+        
+        if result:
+            # Подробная статистика
+            users_processed = result.get('users_processed', 0)
+            notifications_sent = result.get('notifications_sent', 0)
+            errors = result.get('errors', 0)
+            
+            logger.info(f"✅ Диспетчер завершен успешно:")
+            logger.info(f"   👥 Пользователей обработано: {users_processed}")
+            logger.info(f"   📨 Уведомлений отправлено: {notifications_sent}")
+            logger.info(f"   ❌ Ошибок: {errors}")
+            
+            if notifications_sent == 0 and users_processed > 0:
+                logger.info("   ℹ️ Новых уведомлений для отправки не найдено")
+            elif notifications_sent > 0:
+                logger.info(f"   🎉 Успешно отправлено {notifications_sent} уведомлений!")
+        else:
+            logger.warning("⚠️ Диспетчер вернул пустой результат")
+            
         return True
         
     except Exception as e:

@@ -102,6 +102,18 @@ async def main():
             source_name, listings = result
             stats_by_source[source_name] = len(listings)
             all_listings.extend(listings)
+            
+            # Добавляем source к каждому объявлению если его нет
+            for listing in listings:
+                if 'source' not in listing or not listing['source']:
+                    if 'immobiliare' in source_name.lower():
+                        listing['source'] = 'immobiliare'
+                    elif 'subito' in source_name.lower():
+                        listing['source'] = 'subito'
+                    elif 'idealista' in source_name.lower():
+                        listing['source'] = 'idealista'
+                    else:
+                        listing['source'] = source_name.lower()
         
         if not all_listings:
             print("❌ Объявления не найдены ни в одном источнике!")
@@ -114,19 +126,38 @@ async def main():
             
             # Подробная сводка
             from datetime import datetime, timedelta
-            next_run = datetime.now() + timedelta(hours=1)
+            next_run = datetime.now() + timedelta(hours=2)
             
             print(f"\n✅ Парсинг всех источников завершен за {execution_time:.1f}с")
             print(f"📊 Статистика по источникам:")
             for source, count in stats_by_source.items():
-                print(f"   • {source}: {count} объявлений")
+                print(f"   • {source}: {count} объявлений найдено")
             
             print(f"\n💾 Сохранено в БД:")
             print(f"   • Новых: {saved_stats['created']}")
             print(f"   • Обновлено: {saved_stats['updated']}")
-            print(f"   • Общий итог: {len(all_listings)} объявлений")
+            print(f"   • Дубликатов пропущено: {saved_stats.get('skipped_duplicates', 0)}")
+            print(f"   • Ошибок: {saved_stats['errors']}")
+            print(f"   • Общий итог: {len(all_listings)} объявлений обработано")
             
-            print(f"\n⏰ Следующий запуск: {next_run.strftime('%H:%M %d.%m.%Y')} (через 1ч)")
+            # Статистика по источникам в БД
+            if 'by_source' in saved_stats:
+                print(f"\n📈 Детальная статистика по источникам:")
+                for source, source_stats in saved_stats['by_source'].items():
+                    total = source_stats['total']
+                    created = source_stats['created']
+                    updated = source_stats['updated']
+                    skipped = source_stats['skipped']
+                    errors = source_stats['errors']
+                    
+                    print(f"   📌 {source.upper()}:")
+                    print(f"      🆕 Новые: {created}")
+                    print(f"      🔄 Обновлено: {updated}")
+                    print(f"      ⏭️ Пропущено: {skipped}")
+                    print(f"      ❌ Ошибки: {errors}")
+                    print(f"      📊 Итого обработано: {total}")
+            
+            print(f"\n⏰ Следующий запуск: {next_run.strftime('%H:%M %d.%m.%Y')} (через 2ч)")
             
         finally:
             db.close()

@@ -118,64 +118,120 @@ class ScrapingService:
             Dict[str, int]: Статистика сохранения
         """
         if not listings:
-            return {"created": 0, "updated": 0, "errors": 0}
+            return {"created": 0, "updated": 0, "errors": 0, "skipped_duplicates": 0}
             
-        stats = {"created": 0, "updated": 0, "errors": 0}
+        stats = {
+            "created": 0, 
+            "updated": 0, 
+            "errors": 0, 
+            "skipped_duplicates": 0,
+            "by_source": {}
+        }
         
-        logger.debug(f"💾 Сохраняем {len(listings)} объявлений в базу данных...")
+        logger.info(f"💾 Сохраняем {len(listings)} объявлений в базу данных...")
+        
+        # Группируем по источникам для статистики
+        for listing_data in listings:
+            source = listing_data.get('source', 'unknown')
+            if source not in stats["by_source"]:
+                stats["by_source"][source] = {
+                    "total": 0, "created": 0, "updated": 0, "errors": 0, "skipped": 0
+                }
+            stats["by_source"][source]["total"] += 1
         
         for listing_data in listings:
             try:
-                # Проверяем, существует ли уже такое объявление
                 external_id = listing_data.get('external_id')
-                source = listing_data.get('source', 'immobiliare')
+                source = listing_data.get('source', 'unknown')
+                url = listing_data.get('url', '')
                 
                 if not external_id:
                     logger.warning("⚠️ Объявление без external_id, пропускаем")
                     stats["errors"] += 1
+                    stats["by_source"][source]["errors"] += 1
                     continue
                 
+                # Сначала проверяем по external_id + source (основной способ)
                 existing = crud_listing.get_by_external_id(
                     db=db,
                     external_id=external_id,
                     source=source
                 )
                 
+                # Если не найдено по external_id, проверяем по URL
+                if not existing and url:
+                    existing = crud_listing.get_by_url(db=db, url=url)
+                    
+                    if existing and existing.source != source:
+                        # Объявление с таким URL уже есть, но из другого источника
+                        # Обновляем external_id и source в существующем объявлении
+                        logger.info(f"🔗 Найдено существующее объявление с URL {url[:50]}... из источника {existing.source}, обновляем на {source}")
+                        listing_update = ListingCreate(**listing_data)
+                        crud_listing.update(db=db, db_obj=existing, obj_in=listing_update)
+                        stats["updated"] += 1
+                        stats["by_source"][source]["updated"] += 1
+                        continue
+                    elif existing:
+                        # То же самое объявление, пропускаем
+                        logger.debug(f"🔄 Объявление с URL уже существует: {url[:50]}...")
+                        stats["skipped_duplicates"] += 1
+                        stats["by_source"][source]["skipped"] += 1
+                        continue
+                
                 if existing:
                     # Обновляем существующее объявление
                     listing_update = ListingCreate(**listing_data)
                     crud_listing.update(db=db, db_obj=existing, obj_in=listing_update)
                     stats["updated"] += 1
+                    stats["by_source"][source]["updated"] += 1
                     logger.debug(f"🔄 Обновлено объявление {external_id}")
                 else:
                     # Создаем новое объявление
                     listing_create = ListingCreate(**listing_data)
                     crud_listing.create(db=db, obj_in=listing_create)
                     stats["created"] += 1
+                    stats["by_source"][source]["created"] += 1
                     logger.debug(f"✅ Создано объявление {external_id}")
                     
             except Exception as e:
-                logger.error(f"❌ Ошибка сохранения объявления: {e}")
+                error_msg = str(e)
+                source = listing_data.get('source', 'unknown')
                 
-                # Принудительный rollback сессии при ошибках
-                try:
-                    db.rollback()
-                    logger.debug("🔄 Сессия БД откатана")
-                except Exception as rollback_error:
-                    logger.error(f"❌ Ошибка rollback: {rollback_error}")
-                
-                # Детальное логирование для диагностики
-                if "value too long" in str(e):
-                    logger.error(f"🔍 Слишком длинное значение в объявлении {external_id}")
-                    for field, value in listing_data.items():
-                        if isinstance(value, str) and len(value) > 100:
-                            logger.error(f"   📏 Поле '{field}': {len(value)} символов (первые 100: {value[:100]}...)")
-                
-                logger.debug(f"Данные объявления: {listing_data}")
-                stats["errors"] += 1
-                continue
+                # Обработка дубликатов URL
+                if "duplicate key value violates unique constraint" in error_msg and "url" in error_msg:
+                    logger.warning(f"⚠️ Дубликат URL для {external_id}, пропускаем")
+                    stats["skipped_duplicates"] += 1
+                    stats["by_source"][source]["skipped"] += 1
+                    
+                    # НЕ делаем rollback для дубликатов URL - это нормально
+                    continue
+                else:
+                    logger.error(f"❌ Ошибка сохранения объявления {external_id}: {e}")
+                    
+                    # Принудительный rollback сессии при ошибках
+                    try:
+                        db.rollback()
+                        logger.debug("🔄 Сессия БД откатана")
+                    except Exception as rollback_error:
+                        logger.error(f"❌ Ошибка rollback: {rollback_error}")
+                    
+                    # Детальное логирование для диагностики
+                    if "value too long" in error_msg:
+                        logger.error(f"🔍 Слишком длинное значение в объявлении {external_id}")
+                        for field, value in listing_data.items():
+                            if isinstance(value, str) and len(value) > 100:
+                                logger.error(f"   📏 Поле '{field}': {len(value)} символов (первые 100: {value[:100]}...)")
+                    
+                    stats["errors"] += 1
+                    stats["by_source"][source]["errors"] += 1
+                    continue
         
-        logger.debug(f"💾 Сохранено: {stats['created']} новых, {stats['updated']} обновлено, {stats['errors']} ошибок")
+        # Подробная статистика
+        logger.info(f"💾 Статистика сохранения:")
+        logger.info(f"   📊 Общая: {stats['created']} новых, {stats['updated']} обновлено, {stats['skipped_duplicates']} дубликатов, {stats['errors']} ошибок")
+        
+        for source, source_stats in stats["by_source"].items():
+            logger.info(f"   📌 {source}: {source_stats['created']} новых, {source_stats['updated']} обновлено, {source_stats['skipped']} пропущено, {source_stats['errors']} ошибок из {source_stats['total']} всего")
         
         return stats
     
@@ -321,3 +377,77 @@ class ScrapingService:
         except Exception as e:
             logger.error(f"❌ Ошибка в синхронной обертке: {e}")
             return [] 
+
+    def get_database_statistics(self, db: Session) -> Dict[str, Any]:
+        """
+        Получение статистики базы данных по источникам и общих метрик
+        """
+        try:
+            from src.db.models import Listing
+            from sqlalchemy import func, desc
+            from datetime import datetime, timedelta
+            
+            # Общая статистика
+            total_listings = db.query(func.count(Listing.id)).scalar()
+            active_listings = db.query(func.count(Listing.id)).filter(Listing.is_active == True).scalar()
+            
+            # Статистика по источникам
+            source_stats = db.query(
+                Listing.source,
+                func.count(Listing.id).label('total'),
+                func.count(func.nullif(Listing.is_active, False)).label('active')
+            ).group_by(Listing.source).all()
+            
+            # Статистика за последние 24 часа
+            since_24h = datetime.utcnow() - timedelta(hours=24)
+            recent_stats = db.query(
+                Listing.source,
+                func.count(Listing.id).label('recent_24h')
+            ).filter(
+                Listing.created_at >= since_24h
+            ).group_by(Listing.source).all()
+            
+            # Статистика за последнюю неделю
+            since_week = datetime.utcnow() - timedelta(days=7)
+            week_stats = db.query(
+                Listing.source,
+                func.count(Listing.id).label('recent_week')
+            ).filter(
+                Listing.created_at >= since_week
+            ).group_by(Listing.source).all()
+            
+            # Собираем результат
+            result = {
+                "total_listings": total_listings,
+                "active_listings": active_listings,
+                "inactive_listings": total_listings - active_listings,
+                "by_source": {},
+                "recent_24h": {},
+                "recent_week": {}
+            }
+            
+            # Заполняем статистику по источникам
+            for source, total, active in source_stats:
+                result["by_source"][source] = {
+                    "total": total,
+                    "active": active,
+                    "inactive": total - active
+                }
+            
+            # Заполняем недавние статистики
+            for source, count in recent_stats:
+                result["recent_24h"][source] = count
+                
+            for source, count in week_stats:
+                result["recent_week"][source] = count
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения статистики БД: {e}")
+            return {
+                "error": str(e),
+                "total_listings": 0,
+                "active_listings": 0,
+                "by_source": {}
+            } 
