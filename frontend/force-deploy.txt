@@ -2,3 +2,4 @@ force deploy 2025-01-22 - fix CORS with Railway backend
 force deploy $(date)
 force deploy after Railway backend fix - CORS should work now
 force deploy 2025-01-22 23:45 - Fixed API URL detection and CORS configuration
+# Force Vercel redeploy Thu Jul 31 10:51:40 MSK 2025
