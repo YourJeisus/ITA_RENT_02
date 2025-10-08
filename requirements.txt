@@ -43,4 +43,4 @@ python-dotenv==1.0.0
 flake8==6.1.0
 
 # CORS (уже включен в FastAPI)
-# python-cors не нужен, используем встроенный CORSMiddleware 
+# python-cors не нужен, используем встроенный CORSMiddleware twilio

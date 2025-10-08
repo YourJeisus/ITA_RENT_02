@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
     
+    # WhatsApp API настройки (используем WhatsApp Business API)
+    WHATSAPP_API_URL: str = ""  # URL вашего WhatsApp API провайдера
+    WHATSAPP_API_TOKEN: str = ""  # Токен для доступа к API
+    WHATSAPP_PHONE_NUMBER_ID: str = ""  # ID номера телефона в WhatsApp Business
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""  # ID бизнес аккаунта
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = ""  # Токен для верификации webhook
+    WHATSAPP_ENABLED: bool = False  # Включить/выключить WhatsApp уведомления
+    WHATSAPP_NOTIFICATION_INTERVAL_SECONDS: int = 1800  # Интервал WhatsApp уведомлений (30 минут)
+    
     # Scraper Worker настройки
     SCRAPER_WORKER_INTERVAL_HOURS: int = 6  # Запуск каждые 6 часов
     SCRAPER_WORKER_MAX_PAGES: int = 10  # Максимум страниц за цикл

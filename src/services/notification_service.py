@@ -107,8 +107,12 @@ class NotificationService:
                 logger.info(f"🐛 [DEBUG] Фильтр {filter_obj.id} неактивен")
                 return False
             
-            if not user.telegram_chat_id:
-                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет telegram_chat_id")
+            # Проверяем наличие хотя бы одного способа связи
+            has_telegram = bool(user.telegram_chat_id)
+            has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+            
+            if not has_telegram and not has_whatsapp:
+                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных способов уведомлений")
                 return False
             
             logger.info(f"🐛 [DEBUG] Режим отладки - пропускаем проверку времени для фильтра {filter_obj.id}")
@@ -119,8 +123,12 @@ class NotificationService:
             logger.info(f"❌ Фильтр {filter_obj.id} неактивен")
             return False
         
-        if not user.telegram_chat_id:
-            logger.info(f"❌ У пользователя {user.email} нет telegram_chat_id")
+        # Проверяем наличие хотя бы одного способа связи
+        has_telegram = bool(user.telegram_chat_id)
+        has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+        
+        if not has_telegram and not has_whatsapp:
+            logger.info(f"❌ У пользователя {user.email} нет активных способов уведомлений")
             return False
         
         # Определяем частоту уведомлений в зависимости от подписки
@@ -363,37 +371,89 @@ class NotificationService:
     async def send_notification_for_filter(self, user: User, filter_obj: Filter, listings: List[Listing]) -> bool:
         """
         Отправка уведомлений пользователю о новых объявлениях
-        Каждое объявление = отдельное сообщение с фотографиями
+        Поддерживает Telegram и WhatsApp
         """
         try:
-            from src.services.telegram_bot import send_listing_notification
+            from src.core.config import settings
             
             if not listings:
                 return False
             
-            success_count = 0
+            telegram_success = False
+            whatsapp_success = False
             
-            # Отправляем каждое объявление отдельным сообщением
-            for listing in listings[:5]:  # Максимум 5 объявлений за раз
+            # Отправка через Telegram (если настроен)
+            if user.telegram_chat_id:
                 try:
-                    notification_sent = await send_listing_notification(
-                        telegram_chat_id=user.telegram_chat_id,
-                        listing=listing,
-                        filter_obj=filter_obj
-                    )
+                    from src.services.telegram_bot import send_listing_notification
                     
-                    if notification_sent:
-                        success_count += 1
-                        
-                    # Пауза между сообщениями чтобы не спамить
-                    await asyncio.sleep(2)
+                    telegram_count = 0
+                    # Отправляем каждое объявление отдельным сообщением в Telegram
+                    for listing in listings[:5]:  # Максимум 5 объявлений за раз
+                        try:
+                            notification_sent = await send_listing_notification(
+                                telegram_chat_id=user.telegram_chat_id,
+                                listing=listing,
+                                filter_obj=filter_obj
+                            )
+                            
+                            if notification_sent:
+                                telegram_count += 1
+                                
+                            # Пауза между сообщениями чтобы не спамить
+                            await asyncio.sleep(2)
+                            
+                        except Exception as e:
+                            logger.error(f"Ошибка отправки Telegram уведомления об объявлении {listing.id}: {e}")
+                            continue
+                    
+                    telegram_success = telegram_count > 0
+                    if telegram_success:
+                        logger.info(f"📱 Telegram: отправлено {telegram_count} уведомлений пользователю {user.email}")
                     
                 except Exception as e:
-                    logger.error(f"Ошибка отправки уведомления об объявлении {listing.id}: {e}")
-                    continue
+                    logger.error(f"Ошибка отправки Telegram уведомлений: {e}")
             
-            # Если отправили хотя бы одно уведомление - считаем успехом
-            success = success_count > 0
+            # Отправка через WhatsApp (если настроен и включен)
+            if (user.whatsapp_phone and user.whatsapp_enabled and 
+                settings.WHATSAPP_ENABLED):
+                try:
+                    from src.services.whatsapp_service import send_whatsapp_listing_notification
+                    
+                    # Конвертируем объекты Listing в словари
+                    listings_data = []
+                    for listing in listings[:3]:  # WhatsApp: максимум 3 объявления
+                        listings_data.append({
+                            'id': listing.id,
+                            'title': listing.title,
+                            'price': listing.price,
+                            'address': listing.address,
+                            'city': listing.city,
+                            'rooms': listing.rooms,
+                            'area': listing.area,
+                            'url': listing.url,
+                            'source': listing.source,
+                            'images': listing.images if hasattr(listing, 'images') and listing.images else [],
+                            'furnished': listing.furnished if hasattr(listing, 'furnished') else None,
+                            'pets_allowed': listing.pets_allowed if hasattr(listing, 'pets_allowed') else None,
+                            'floor': listing.floor if hasattr(listing, 'floor') else None
+                        })
+                    
+                    whatsapp_sent = await send_whatsapp_listing_notification(
+                        phone_number=user.whatsapp_phone,
+                        listings=listings_data,
+                        filter_name=filter_obj.name
+                    )
+                    
+                    whatsapp_success = whatsapp_sent
+                    if whatsapp_success:
+                        logger.info(f"📱 WhatsApp: отправлено уведомление с {len(listings_data)} объявлениями пользователю {user.email}")
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка отправки WhatsApp уведомлений: {e}")
+            
+            # Считаем успехом если хотя бы один канал сработал
+            success = telegram_success or whatsapp_success
             
             if success:
                 db = self.get_db()
@@ -422,7 +482,14 @@ class NotificationService:
                 
                 try:
                     db.commit()
-                    logger.info(f"📧 Отправлено {success_count} уведомлений пользователю {user.email}")
+                    # Формируем детальный отчет об отправке
+                    channels = []
+                    if telegram_success:
+                        channels.append("Telegram")
+                    if whatsapp_success:
+                        channels.append("WhatsApp")
+                    
+                    logger.info(f"📧 Уведомления отправлены пользователю {user.email} через: {', '.join(channels)}")
                     return True
                 except Exception as e:
                     logger.error(f"Ошибка сохранения в БД: {e}")
@@ -443,9 +510,13 @@ class NotificationService:
         from src.core.config import settings
         debug_mode = settings.DEBUG_NOTIFICATIONS
         
-        if not user.telegram_chat_id:
+        # Проверяем наличие хотя бы одного способа связи
+        has_telegram = bool(user.telegram_chat_id)
+        has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+        
+        if not has_telegram and not has_whatsapp:
             if debug_mode:
-                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет telegram_chat_id")
+                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных способов уведомлений")
             return 0
         
         sent_count = 0  # Инициализируем счетчик
@@ -530,13 +601,28 @@ class NotificationService:
         }
         
         try:
-            # Получаем всех активных пользователей с привязанными Telegram аккаунтами
+            # Получаем всех активных пользователей с привязанными Telegram или WhatsApp аккаунтами
+            from sqlalchemy import or_, and_
+            
             users = self.get_db().query(User).filter(
                 User.is_active == True,
-                User.telegram_chat_id.isnot(None)
+                or_(
+                    User.telegram_chat_id.isnot(None),
+                    and_(
+                        User.whatsapp_phone.isnot(None),
+                        User.whatsapp_enabled == True,
+                        settings.WHATSAPP_ENABLED == True
+                    )
+                )
             ).all()
             
-            logger.info(f"Найдено {len(users)} пользователей с привязанными Telegram аккаунтами")
+            # Подсчитываем пользователей по типам уведомлений
+            telegram_users = sum(1 for user in users if user.telegram_chat_id)
+            whatsapp_users = sum(1 for user in users if user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+            
+            logger.info(f"Найдено {len(users)} пользователей с активными уведомлениями:")
+            logger.info(f"  - Telegram: {telegram_users}")
+            logger.info(f"  - WhatsApp: {whatsapp_users}")
             
             for user in users:
                 try:

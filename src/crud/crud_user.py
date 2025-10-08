@@ -28,6 +28,14 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             logger.error(f"Ошибка при поиске пользователя по telegram_chat_id {telegram_chat_id}: {e}")
             return None
     
+    def get_by_whatsapp_phone(self, db: Session, *, whatsapp_phone: str) -> Optional[User]:
+        """Получить пользователя по WhatsApp номеру телефона"""
+        try:
+            return db.query(User).filter(User.whatsapp_phone == whatsapp_phone).first()
+        except Exception as e:
+            logger.error(f"Ошибка при поиске пользователя по whatsapp_phone {whatsapp_phone}: {e}")
+            return None
+    
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
         """Создать пользователя с хешированным паролем"""
         from src.core.security import get_password_hash
@@ -100,6 +108,41 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db.refresh(user)
         return user
     
+    def link_whatsapp(self, db: Session, *, user_id: int, whatsapp_phone: str, 
+                      whatsapp_instance_id: str = None, enabled: bool = True) -> User:
+        """Привязать WhatsApp к аккаунту пользователя"""
+        user = self.get(db, id=user_id)
+        if user:
+            user.whatsapp_phone = whatsapp_phone
+            user.whatsapp_instance_id = whatsapp_instance_id
+            user.whatsapp_enabled = enabled
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    
+    def unlink_whatsapp(self, db: Session, *, user_id: int) -> User:
+        """Отвязать WhatsApp от аккаунта пользователя"""
+        user = self.get(db, id=user_id)
+        if user:
+            user.whatsapp_phone = None
+            user.whatsapp_instance_id = None
+            user.whatsapp_enabled = False
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    
+    def toggle_whatsapp(self, db: Session, *, user_id: int, enabled: bool) -> User:
+        """Включить/выключить WhatsApp уведомления"""
+        user = self.get(db, id=user_id)
+        if user:
+            user.whatsapp_enabled = enabled
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+    
     def update_subscription(self, db: Session, *, user_id: int, subscription_type: str, expires_at=None) -> User:
         """Обновить подписку пользователя"""
         user = self.get(db, id=user_id)
@@ -154,4 +197,27 @@ def create_user(db: Session, **kwargs) -> User:
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     """Аутентификация пользователя"""
-    return user.authenticate(db, email=email, password=password) 
+    return user.authenticate(db, email=email, password=password)
+
+# WhatsApp функции-обертки
+def get_by_whatsapp_phone(db: Session, whatsapp_phone: str) -> Optional[User]:
+    """Получить пользователя по WhatsApp номеру"""
+    return user.get_by_whatsapp_phone(db, whatsapp_phone=whatsapp_phone)
+
+def get_user_by_whatsapp_phone(db: Session, whatsapp_phone: str) -> Optional[User]:
+    """Получить пользователя по WhatsApp номеру (альтернативное название)"""
+    return user.get_by_whatsapp_phone(db, whatsapp_phone=whatsapp_phone)
+
+def link_whatsapp(db: Session, user_id: int, whatsapp_phone: str, 
+                  whatsapp_instance_id: str = None, enabled: bool = True) -> User:
+    """Привязать WhatsApp к аккаунту пользователя"""
+    return user.link_whatsapp(db, user_id=user_id, whatsapp_phone=whatsapp_phone, 
+                              whatsapp_instance_id=whatsapp_instance_id, enabled=enabled)
+
+def unlink_whatsapp(db: Session, user_id: int) -> User:
+    """Отвязать WhatsApp от аккаунта пользователя"""
+    return user.unlink_whatsapp(db, user_id=user_id)
+
+def toggle_whatsapp_notifications(db: Session, user_id: int, enabled: bool) -> User:
+    """Включить/выключить WhatsApp уведомления"""
+    return user.toggle_whatsapp(db, user_id=user_id, enabled=enabled) 

@@ -1,0 +1,48 @@
+---
+alwaysApply: true
+---
+
+get_code
+Use the MCP to get code for your Figma selection. By default, the output is React + Tailwind, but you can customize it through your prompt.
+
+Suggested prompts:
+
+Change the framework
+generate my Figma selection in Vue
+generate my Figma selection in plain HTML + CSS
+generate my Figma selection in iOS
+Use your components
+generate my Figma selection using components from src/components/ui
+\*Tip: set up Code Connect for best code reuse results
+Combine both
+generate my Figma selection using components from src/ui and style with Tailwind
+Note: Selection-based prompting only works with the local MCP server. The remote server requires a link to a frame or layer to extract context.
+
+get_variable_defs (local only)
+Returns the variables and styles used in your Figma selection (such as colors, spacing, typography).
+
+You can ask it to:
+
+List all tokens used
+get the variables used in my Figma selection
+Focus on a specific type
+what color and spacing variables are used in my Figma selection?
+Get both names and values
+list the variable names and their values used in my Figma selection
+get_code_connect_map (local only)
+Retrieves a mapping between Figma node IDs and their corresponding code components in your codebase. Specifically, it returns an object where each key is a Figma node ID, and the value contains:
+
+codeConnectSrc: The location of the component in your codebase (e.g., a file path or URL).
+codeConnectName: The name of the component in your codebase.
+This mapping is used to connect Figma design elements directly to their React (or other framework) implementations, enabling seamless design-to-code workflows and ensuring that the correct components are used for each part of the design. If a Figma node is connected to a code component, this function helps you identify and use the exact component in your project.
+
+get_screenshot
+Allows the agent to take a screenshot of your selection. This helps preserve layout fidelity in the generated code. Recommended to keep on (only turn off if you're concerned about token limits).
+
+create_design_system_rules
+A tool for creating a rule file that provide agents with the right context to translate designs into high-quality, codebase-aware frontend code. It helps ensure alignment with your design system and tech stack, improving the relevance and accuracy of generated output.
+
+Run this tool and make sure the result is saved to the correct rules/ or instructions/ path so your agent can access it during code generation.
+
+get_metadata
+Returns a sparse XML representation of your selection containing just basic properties such as the layer IDs, names, types, position and sizes. This is an outline that your Agent can then break down and call get_code on to retrieve only the styling information of the design it needs. Useful for very large designs where get_code produces output with a large context size. It also works with multiple selections or the whole page if you don't select anything.

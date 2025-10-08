@@ -39,6 +39,13 @@ class User(Base):
     )
     telegram_username: Mapped[Optional[str]] = mapped_column(String(100))
     
+    # WhatsApp интеграция
+    whatsapp_phone: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, unique=True, index=True
+    )
+    whatsapp_instance_id: Mapped[Optional[str]] = mapped_column(String(100))
+    whatsapp_enabled: Mapped[bool] = mapped_column(default=False, index=True)
+    
     # Подписка (упрощенная модель для MVP)
     subscription_type: Mapped[str] = mapped_column(
         String(50), default="free", index=True
@@ -68,6 +75,8 @@ class User(Base):
     __table_args__ = (
         Index('idx_user_email_active', 'email', 'is_active'),
         Index('idx_user_subscription', 'subscription_type', 'subscription_expires_at'),
+        Index('idx_user_whatsapp_enabled', 'whatsapp_enabled', 'whatsapp_phone'),
+        Index('idx_user_messaging', 'telegram_chat_id', 'whatsapp_phone'),
     )
 
     def __repr__(self):
