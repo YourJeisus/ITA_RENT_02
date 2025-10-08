@@ -162,4 +162,5 @@ frontend/dist/
 
 # Temporary files
 tmp/
-temp/ 
+temp/ env.twilio.example
+twilio_settings.txt
