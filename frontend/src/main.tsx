@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 // import { GoogleOAuthProvider } from '@react-oauth/google'; // Temporarily disabled
 import App from "./App";
-import "./styles/index.scss";
+import "./index.css";
 
 // const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID; // Temporarily disabled
 
