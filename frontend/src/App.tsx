@@ -1,7 +1,6 @@
-import React from "react";
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./pages/HomePage";
+import NewHomePage from "./pages/NewHomePage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import AuthPage from "./pages/AuthPage";
 import FiltersPage from "./pages/FiltersPage";
@@ -20,23 +19,26 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <PageLayout>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchResultsPage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route
-          path="/filters"
-          element={
+    <Routes>
+      {/* New Home Page without PageLayout (has its own navbar) */}
+      <Route path="/" element={<NewHomePage />} />
+      
+      {/* Other pages with PageLayout */}
+      <Route path="/search" element={<PageLayout><SearchResultsPage /></PageLayout>} />
+      <Route path="/auth" element={<PageLayout><AuthPage /></PageLayout>} />
+      <Route
+        path="/filters"
+        element={
+          <PageLayout>
             <ProtectedRoute>
               <FiltersPage />
             </ProtectedRoute>
-          }
-        />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </PageLayout>
+          </PageLayout>
+        }
+      />
+      <Route path="/map" element={<PageLayout><MapPage /></PageLayout>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
