@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import NewHomePage from "./pages/NewHomePage";
-import SearchResultsPage from "./pages/SearchResultsPage";
+import NewSearchResultsPage from "./pages/NewSearchResultsPage";
 import AuthPage from "./pages/AuthPage";
 import FiltersPage from "./pages/FiltersPage";
 import MapPage from "./pages/MapPage";
@@ -22,10 +22,17 @@ function App() {
     <Routes>
       {/* New Home Page without PageLayout (has its own navbar) */}
       <Route path="/" element={<NewHomePage />} />
-      
-      {/* Other pages with PageLayout */}
-      <Route path="/search" element={<PageLayout><SearchResultsPage /></PageLayout>} />
-      <Route path="/auth" element={<PageLayout><AuthPage /></PageLayout>} />
+
+      {/* Search page with new design without PageLayout (has its own navbar) */}
+      <Route path="/search" element={<NewSearchResultsPage />} />
+      <Route
+        path="/auth"
+        element={
+          <PageLayout>
+            <AuthPage />
+          </PageLayout>
+        }
+      />
       <Route
         path="/filters"
         element={
@@ -36,7 +43,14 @@ function App() {
           </PageLayout>
         }
       />
-      <Route path="/map" element={<PageLayout><MapPage /></PageLayout>} />
+      <Route
+        path="/map"
+        element={
+          <PageLayout>
+            <MapPage />
+          </PageLayout>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

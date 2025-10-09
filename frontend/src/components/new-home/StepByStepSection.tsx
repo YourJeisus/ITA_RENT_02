@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import robotIcon from "../../designSvg/robot.svg";
 
 const StepByStepSection: React.FC = () => {
   return (
@@ -19,7 +20,9 @@ const StepByStepSection: React.FC = () => {
                   </p>
                 </div>
                 <div className="w-[64px] h-[64px] bg-[#e0ecff] rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">U</span>
+                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">
+                    U
+                  </span>
                 </div>
               </div>
             </div>
@@ -27,12 +30,11 @@ const StepByStepSection: React.FC = () => {
             {/* Bot Response 1 */}
             <div className="flex justify-start">
               <div className="flex items-start gap-[16px]">
-                <div className="w-[64px] h-[64px] bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-gray-600">🤖</span>
-                </div>
+                <img src={robotIcon} alt="Bot" className="w-[64px] h-[64px]" />
                 <div className="bg-[#f1f5fe] px-[24px] py-[16px] rounded-bl-[22px] rounded-br-[22px] rounded-tr-[22px] max-w-[600px]">
                   <p className="font-medium text-[18px] leading-[32px] text-gray-900">
-                    Got it! I'll find matching listings for you as soon as they appear.
+                    Got it! I'll find matching listings for you as soon as they
+                    appear.
                   </p>
                 </div>
               </div>
@@ -47,7 +49,9 @@ const StepByStepSection: React.FC = () => {
                   </p>
                 </div>
                 <div className="w-[64px] h-[64px] bg-[#e0ecff] rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">U</span>
+                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">
+                    U
+                  </span>
                 </div>
               </div>
             </div>
@@ -61,7 +65,9 @@ const StepByStepSection: React.FC = () => {
                   </p>
                 </div>
                 <div className="w-[64px] h-[64px] bg-[#e0ecff] rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">U</span>
+                  <span className="font-medium text-[24px] leading-[28px] text-blue-600">
+                    U
+                  </span>
                 </div>
               </div>
             </div>
@@ -69,12 +75,11 @@ const StepByStepSection: React.FC = () => {
             {/* Bot Response 2 */}
             <div className="flex justify-start">
               <div className="flex items-start gap-[16px]">
-                <div className="w-[64px] h-[64px] bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-gray-600">🤖</span>
-                </div>
+                <img src={robotIcon} alt="Bot" className="w-[64px] h-[64px]" />
                 <div className="bg-[#f1f5fe] px-[24px] py-[16px] rounded-bl-[22px] rounded-br-[22px] rounded-tr-[22px] max-w-[600px]">
                   <p className="font-medium text-[18px] leading-[32px] text-gray-900">
-                    I'll send new listings directly to your WhatsApp  :)<br />
+                    I'll send new listings directly to your WhatsApp :)
+                    <br />
                     I'm watching everything 24/7 — you'll be the first to know.
                   </p>
                 </div>
@@ -84,9 +89,7 @@ const StepByStepSection: React.FC = () => {
             {/* Bot Response 3 */}
             <div className="flex justify-start">
               <div className="flex items-start gap-[16px]">
-                <div className="w-[64px] h-[64px] bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="font-medium text-[24px] leading-[28px] text-gray-600">🤖</span>
-                </div>
+                <img src={robotIcon} alt="Bot" className="w-[64px] h-[64px]" />
                 <div className="bg-[#f1f5fe] px-[24px] py-[16px] rounded-bl-[22px] rounded-br-[22px] rounded-tr-[22px] max-w-[600px]">
                   <p className="font-medium text-[18px] leading-[32px] text-gray-900">
                     Set your filters — and I'll start looking for your place.
@@ -108,4 +111,3 @@ const StepByStepSection: React.FC = () => {
 };
 
 export default StepByStepSection;
-

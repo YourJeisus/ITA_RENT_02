@@ -1,25 +1,95 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import arrowDown from '../../assets/new-design/arrow-down.svg';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CityDropdown from "./CityDropdown";
+import SimpleDropdown from "./SimpleDropdown";
+import RoomsDropdown from "./RoomsDropdown";
+import PriceDropdown from "./PriceDropdown";
+import FiltersDropdown from "./FiltersDropdown";
 
 const NewHero: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useState({
-    city: 'City',
-    type: 'Rent',
-    propertyType: 'Property type',
-    rooms: 'Rooms',
-    price: 'Price',
-    filters: 'Filters',
-    neighborhood: '',
+    city: "City",
+    type: "Rent",
+    propertyType: "Property type",
+    rooms: "Rooms",
+    price: "Price",
+    neighborhood: "",
   });
+  const [filters, setFilters] = useState<string[]>([]);
+
+  const mapFiltersToUrlParams = () => {
+    const params = new URLSearchParams();
+
+    // City
+    if (searchParams.city !== "City") {
+      params.append("city", searchParams.city.toLowerCase());
+    }
+
+    // Property Type
+    if (searchParams.propertyType !== "Property type") {
+      const propertyTypeMap: { [key: string]: string } = {
+        Apartment: "apartment",
+        House: "house",
+        Studio: "studio",
+        Room: "room",
+        Villa: "house",
+        Loft: "apartment",
+      };
+      const mappedType = propertyTypeMap[searchParams.propertyType];
+      if (mappedType) {
+        params.append("property_type", mappedType);
+      }
+    }
+
+    // Rooms
+    if (searchParams.rooms !== "Rooms") {
+      if (searchParams.rooms === "Studio") {
+        params.append("property_type", "studio");
+      } else if (searchParams.rooms === "5+") {
+        params.append("rooms", "5");
+        params.append("rooms", "6");
+        params.append("rooms", "7");
+      } else {
+        params.append("rooms", searchParams.rooms);
+      }
+    }
+
+    // Price
+    if (searchParams.price !== "Price") {
+      const priceMatch = searchParams.price.match(/€(\d+)\s*-\s*€(\d+|∞)/);
+      if (priceMatch) {
+        if (priceMatch[1] !== "0") {
+          params.append("price_min", priceMatch[1]);
+        }
+        if (priceMatch[2] !== "∞") {
+          params.append("price_max", priceMatch[2]);
+        }
+      } else {
+        // Quick select format "Up to €1500"
+        const quickMatch = searchParams.price.match(/Up to €(\d+)/);
+        if (quickMatch) {
+          params.append("price_max", quickMatch[1]);
+        }
+      }
+    }
+
+    // Filters - пока не добавляем, так как API не поддерживает большинство из них
+    // В будущем можно добавить поддержку этих фильтров
+
+    return params.toString();
+  };
 
   const handleSearch = () => {
-    navigate('/search');
+    const urlParams = mapFiltersToUrlParams();
+    const searchUrl = `/search${urlParams ? `?${urlParams}` : ""}`;
+    window.open(searchUrl, "_blank");
   };
 
   const handleExploreMap = () => {
-    navigate('/map');
+    const urlParams = mapFiltersToUrlParams();
+    const mapUrl = `/map${urlParams ? `?${urlParams}` : ""}`;
+    window.open(mapUrl, "_blank");
   };
 
   return (
@@ -32,7 +102,8 @@ const NewHero: React.FC = () => {
 
         {/* Subtitle */}
         <p className="font-medium text-[22px] leading-[32px] text-center text-gray-600 mb-[68px] max-w-[856px] mx-auto">
-          AI-powered assistant that finds apartments for you and sends them straight
+          AI-powered assistant that finds apartments for you and sends them
+          straight
           <br />
           to your WhatsApp.
         </p>
@@ -45,50 +116,51 @@ const NewHero: React.FC = () => {
         {/* Search Bar */}
         <div className="bg-white h-[64px] rounded-[12px] flex items-center px-[24px] mb-[28px]">
           {/* City */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.city}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <CityDropdown
+            value={searchParams.city}
+            onChange={(city) => setSearchParams({ ...searchParams, city })}
+          />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
           {/* Rent */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.type}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <SimpleDropdown
+            value={searchParams.type}
+            options={["Short term rent", "Long term rent"]}
+            onChange={(type) => setSearchParams({ ...searchParams, type })}
+          />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
           {/* Property type */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.propertyType}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <SimpleDropdown
+            value={searchParams.propertyType}
+            options={["Apartment", "House", "Studio", "Room", "Villa", "Loft"]}
+            onChange={(propertyType) =>
+              setSearchParams({ ...searchParams, propertyType })
+            }
+          />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
           {/* Rooms */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.rooms}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <RoomsDropdown
+            value={searchParams.rooms}
+            onChange={(rooms) => setSearchParams({ ...searchParams, rooms })}
+          />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
           {/* Price */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.price}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <PriceDropdown
+            value={searchParams.price}
+            onChange={(price) => setSearchParams({ ...searchParams, price })}
+          />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
           {/* Filters */}
-          <div className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors">
-            <span className="font-normal text-[16px] text-gray-900 leading-[24px]">{searchParams.filters}</span>
-            <img src={arrowDown} alt="" className="w-[16px] h-[16px]" />
-          </div>
+          <FiltersDropdown value={filters} onChange={setFilters} />
 
           <div className="w-[1px] h-[64px] bg-gray-200" />
 
@@ -98,19 +170,21 @@ const NewHero: React.FC = () => {
             placeholder="Neighborhood, Metro"
             className="flex-1 px-[16px] py-[10px] bg-white rounded-[8px] font-normal text-[16px] text-gray-900 leading-[24px] outline-none placeholder:text-gray-400"
             value={searchParams.neighborhood}
-            onChange={(e) => setSearchParams({ ...searchParams, neighborhood: e.target.value })}
+            onChange={(e) =>
+              setSearchParams({ ...searchParams, neighborhood: e.target.value })
+            }
           />
         </div>
 
         {/* Buttons */}
         <div className="flex items-center justify-end gap-[12px]">
-          <button 
+          <button
             onClick={handleExploreMap}
             className="border border-slate-300 border-solid px-[24px] py-[8px] rounded-[8px] font-semibold text-[16px] text-gray-900 leading-[24px] hover:bg-gray-50 transition-colors"
           >
             Explore on map
           </button>
-          <button 
+          <button
             onClick={handleSearch}
             className="bg-blue-600 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-white leading-[24px] hover:bg-blue-700 transition-colors"
           >
@@ -123,4 +197,3 @@ const NewHero: React.FC = () => {
 };
 
 export default NewHero;
-

@@ -1,9 +1,9 @@
-import React from 'react';
-import catEmoji from '../../assets/new-design/cat-emoji.svg';
+import React from "react";
+import kittenIcon from "../../designSvg/kitten.svg";
 
 const CatSection: React.FC = () => {
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -19,7 +19,7 @@ const CatSection: React.FC = () => {
           </p>
 
           <div className="flex justify-center mb-[32px]">
-            <img src={catEmoji} alt="Cat" className="w-[120px] h-[120px]" />
+            <img src={kittenIcon} alt="Cat" className="w-[120px] h-[120px]" />
           </div>
 
           <button
@@ -35,4 +35,3 @@ const CatSection: React.FC = () => {
 };
 
 export default CatSection;
-

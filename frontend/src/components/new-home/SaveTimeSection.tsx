@@ -1,10 +1,10 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const SaveTimeSection: React.FC = () => {
   const navigate = useNavigate();
 
-  const platforms = ['Casa', 'Idealista', 'Immobiliare', 'Subito'];
+  const platforms = ["Casa", "Idealista", "Immobiliare", "Subito"];
 
   return (
     <div className="bg-[#eaf4fd] py-[60px]">
@@ -14,16 +14,16 @@ const SaveTimeSection: React.FC = () => {
             <div>
               <h2 className="font-bold text-[48px] leading-[56px] text-gray-900 mb-[32px] max-w-[505px]">
                 Save your time —<br />
-                I'll find the best place<br />
+                I'll find the best place
+                <br />
                 for you.
               </h2>
             </div>
 
             <div className="max-w-[461px]">
               <p className="font-medium text-[18px] leading-[32px] text-gray-900 mb-[24px]">
-                Tell me what you're looking for — your dream place, budget, area. I'll find listings on the most
-                <br />
-                popular platforms:
+                Tell me what you're looking for — your dream place, budget,
+                area. I'll find listings on the most popular platforms:
               </p>
 
               <div className="flex flex-wrap gap-[16px] mb-[28px]">
@@ -40,7 +40,7 @@ const SaveTimeSection: React.FC = () => {
               </div>
 
               <button
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate("/auth")}
                 className="bg-blue-600 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-white leading-[24px] hover:bg-blue-700 transition-colors"
               >
                 Let's set things up
@@ -54,4 +54,3 @@ const SaveTimeSection: React.FC = () => {
 };
 
 export default SaveTimeSection;
-

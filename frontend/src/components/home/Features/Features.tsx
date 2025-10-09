@@ -1,30 +1,27 @@
-import React from 'react';
-import styles from './Features.module.css';
-
-// Импортируем иконки. Предположим, что они у нас есть. 
-// Если нет, я временно использую плейсхолдеры.
-// import { ReactComponent as NoCommissionIcon } from '@/assets/icons/no-commission.svg';
-// import { ReactComponent as QualityIcon } from '@/assets/icons/quality.svg';
-// import { ReactComponent as FastIcon } from '@/assets/icons/fast.svg';
+import React from "react";
+import styles from "./Features.module.css";
+import clockIcon from "../../../designSvg/icon_01_clock.svg";
+import armsIcon from "../../../designSvg/icon_02_arms.svg";
+import cleanerIcon from "../../../designSvg/icon_03_cleaner.svg";
 
 const featuresData = [
   {
-    // Icon: NoCommissionIcon,
-    Icon: () => <>Icon1</>, // Placeholder
-    title: 'Без посредников',
-    description: 'Мы ищем объявления только от собственников, чтобы вы не переплачивали.',
+    icon: clockIcon,
+    title: "Очень быстро",
+    description:
+      "Получайте уведомления в Telegram в ту же минуту, как объявление появилось.",
   },
   {
-    // Icon: QualityIcon,
-    Icon: () => <>Icon2</>, // Placeholder
-    title: 'Хороший ремонт',
-    description: 'Алгоритмы отсеивают квартиры с «бабушкиным» ремонтом и плохими фото.',
+    icon: armsIcon,
+    title: "Без посредников",
+    description:
+      "Мы ищем объявления только от собственников, чтобы вы не переплачивали.",
   },
   {
-    // Icon: FastIcon,
-    Icon: () => <>Icon3</>, // Placeholder
-    title: 'Очень быстро',
-    description: 'Получайте уведомления в Telegram в ту же минуту, как объявление появилось.',
+    icon: cleanerIcon,
+    title: "Хороший ремонт",
+    description:
+      "Алгоритмы отсеивают квартиры с «бабушкиным» ремонтом и плохими фото.",
   },
 ];
 
@@ -35,7 +32,7 @@ const Features: React.FC = () => {
         {featuresData.map((feature, index) => (
           <div key={index} className={styles.featureCard}>
             <div className={styles.iconWrapper}>
-              <feature.Icon />
+              <img src={feature.icon} alt="" className={styles.icon} />
             </div>
             <h3 className={styles.featureTitle}>{feature.title}</h3>
             <p className={styles.featureDescription}>{feature.description}</p>
@@ -46,4 +43,4 @@ const Features: React.FC = () => {
   );
 };
 
-export default Features; 
+export default Features;
