@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { CircularProgress, Alert, Pagination, Box } from "@mui/material";
 import NewListingCard from "../components/search/NewListingCard/NewListingCard";
 import NewFiltersSidebar from "../components/search/NewFiltersSidebar/NewFiltersSidebar";
+import NewNavbar from "../components/new-home/NewNavbar";
 import AuthFooter from "../components/auth/AuthFooter";
 import { useListingStore } from "../store/listingStore";
 import { FilterState } from "../types";
@@ -110,42 +111,7 @@ const NewSearchResultsPage: React.FC = () => {
   return (
     <div className="bg-[#eaf4fd] min-h-screen">
       {/* Navbar */}
-      <nav className="bg-white h-[72px] flex items-center px-[160px] justify-between">
-        <div
-          className="font-bold text-[22px] text-blue-600 cursor-pointer"
-          onClick={() => navigate("/")}
-        >
-          RentAg
-        </div>
-        <div className="flex items-center gap-[32px]">
-          <span className="font-normal text-[16px] text-gray-900 cursor-pointer hover:text-blue-600 transition-colors">
-            Apartment search
-          </span>
-          <span className="font-normal text-[16px] text-gray-900 cursor-pointer hover:text-blue-600 transition-colors">
-            How it works
-          </span>
-          <span className="font-normal text-[16px] text-gray-900 cursor-pointer hover:text-blue-600 transition-colors">
-            Contact
-          </span>
-          <span className="font-normal text-[16px] text-gray-900 cursor-pointer hover:text-blue-600 transition-colors">
-            FAQ
-          </span>
-        </div>
-        <div className="flex items-center gap-[12px]">
-          <button
-            onClick={() => navigate("/auth")}
-            className="border border-slate-300 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-gray-900 hover:bg-gray-50 transition-colors"
-          >
-            Log in
-          </button>
-          <button
-            onClick={() => navigate("/auth")}
-            className="bg-blue-600 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-white hover:bg-blue-700 transition-colors"
-          >
-            Sign up
-          </button>
-        </div>
-      </nav>
+      <NewNavbar />
 
       <div className="px-[160px] py-[48px]">
         {/* Breadcrumb */}
