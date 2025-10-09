@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import NewHomePage from "./pages/NewHomePage";
 import NewSearchResultsPage from "./pages/NewSearchResultsPage";
-import AuthPage from "./pages/AuthPage";
+import SignUpPage from "./pages/SignUpPage";
+import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import FiltersPage from "./pages/FiltersPage";
 import MapPage from "./pages/MapPage";
 import PageLayout from "./components/layout/PageLayout/PageLayout";
@@ -25,14 +27,15 @@ function App() {
 
       {/* Search page with new design without PageLayout (has its own navbar) */}
       <Route path="/search" element={<NewSearchResultsPage />} />
-      <Route
-        path="/auth"
-        element={
-          <PageLayout>
-            <AuthPage />
-          </PageLayout>
-        }
-      />
+      
+      {/* New Auth pages without PageLayout (have their own header/footer) */}
+      <Route path="/auth/signup" element={<SignUpPage />} />
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+      
+      {/* Redirect old /auth to /auth/login */}
+      <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+      
       <Route
         path="/filters"
         element={
