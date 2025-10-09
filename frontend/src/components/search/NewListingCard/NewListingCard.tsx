@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Listing } from "../../../types";
 
 interface NewListingCardProps {
@@ -16,31 +16,44 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   onShare,
   onShowMap,
 }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   // ===== Обработка изображений =====
-  const getImageUrl = (): string => {
+  const getImages = (): string[] => {
     if (listing.photos_urls && listing.photos_urls.length > 0) {
-      return listing.photos_urls[0];
+      return listing.photos_urls;
     }
     if (listing.imageUrls && listing.imageUrls.length > 0) {
-      return listing.imageUrls[0];
+      return listing.imageUrls;
     }
-    return "https://via.placeholder.com/306x200?text=No+Image";
+    return ["https://via.placeholder.com/306x200?text=No+Image"];
   };
 
-  // ===== Форматирование заголовка =====
+  const images = getImages();
+  const currentImage = images[currentImageIndex];
+
+  // Обработка движения мыши для смены изображений
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const imageIndex = Math.floor((x / width) * images.length);
+    setCurrentImageIndex(Math.min(imageIndex, images.length - 1));
+  };
+
+  const handleMouseLeave = () => {
+    setCurrentImageIndex(0);
+  };
+
+  // ===== Форматирование заголовка (комнаты, метраж, этаж) =====
   const getTitle = (): string => {
     const parts: string[] = [];
     
-    // Проверка на студию
+    // Количество комнат
     if (listing.property_type === "studio" || listing.num_rooms === 0) {
       parts.push("Studio");
     } else if (listing.num_rooms) {
-      parts.push(`${listing.num_rooms}-room`);
-    }
-    
-    // Тип недвижимости (если не студия)
-    if (listing.property_type && listing.property_type !== "studio") {
-      parts.push(listing.property_type);
+      parts.push(`${listing.num_rooms}-room apt.`);
     }
     
     // Площадь
@@ -49,38 +62,41 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       parts.push(`${area} m²`);
     }
     
-    // Этажи (если есть и это дом/вилла)
-    if (listing.floor && (listing.property_type === "house" || listing.property_type === "villa")) {
+    // Этаж (формат: "5/8 floor" если есть общее количество этажей)
+    if (listing.floor) {
       const floorMatch = listing.floor.match(/\d+/);
       if (floorMatch) {
-        parts.push(`${floorMatch[0]} floor${parseInt(floorMatch[0]) > 1 ? 's' : ''}`);
+        const currentFloor = floorMatch[0];
+        // Если есть информация об общем количестве этажей
+        if (listing.floor && typeof listing.floor === 'string') {
+          const totalFloorsMatch = listing.floor.match(/\/(\d+)/);
+          if (totalFloorsMatch) {
+            parts.push(`${currentFloor}/${totalFloorsMatch[1]} floor`);
+          } else {
+            parts.push(`${currentFloor} floor`);
+          }
+        } else {
+          parts.push(`${currentFloor} floor`);
+        }
       }
     }
     
     return parts.join(", ");
   };
 
-  // ===== Форматирование описания =====
-  const getDescription = (): string => {
-    if (!listing.description) {
-      return "";
+  // ===== Форматирование адреса =====
+  const getAddress = (): string => {
+    // Используем address_text или составляем из частей
+    if (listing.address_text) {
+      return listing.address_text;
     }
     
-    // Убираем лишние пробелы и переносы строк
-    let text = listing.description.replace(/\s+/g, ' ').trim();
+    const parts: string[] = [];
+    if (listing.address) parts.push(listing.address);
+    if (listing.district) parts.push(listing.district);
+    if (listing.city) parts.push(listing.city);
     
-    // Обрезаем до 100 символов
-    if (text.length > 100) {
-      text = text.substring(0, 100);
-      // Обрезаем по последнему слову
-      const lastSpace = text.lastIndexOf(' ');
-      if (lastSpace > 0) {
-        text = text.substring(0, lastSpace);
-      }
-      text += '...';
-    }
-    
-    return text;
+    return parts.join(", ") || "Address not available";
   };
 
   // ===== Форматирование цены =====
@@ -91,27 +107,34 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
     return `€ ${listing.price.toLocaleString('en-US')}`;
   };
 
-  // ===== Получение features для отображения =====
-  const getDisplayFeatures = (): string[] => {
-    if (!listing.features || listing.features.length === 0) {
-      return [];
+  // ===== Получение комиссии агента =====
+  const getCommission = (): string | null => {
+    // Ищем информацию о комиссии в описании или features
+    if (listing.commission) {
+      return listing.commission;
     }
     
-    // Приоритетные features
-    const priority = ["Sea view", "No deposit", "Furnished", "Pet-friendly"];
-    
-    // Сначала ищем приоритетные
-    const priorityFeatures = listing.features.filter(f => 
-      priority.some(p => f.toLowerCase().includes(p.toLowerCase()))
-    );
-    
-    // Если есть приоритетные, берем первые 2
-    if (priorityFeatures.length > 0) {
-      return priorityFeatures.slice(0, 2);
+    // Ищем в features
+    if (listing.features) {
+      const commissionFeature = listing.features.find(f => 
+        f.toLowerCase().includes('commission') || 
+        f.toLowerCase().includes('no deposit') ||
+        f.toLowerCase().includes('комиссия')
+      );
+      if (commissionFeature) {
+        return commissionFeature;
+      }
     }
     
-    // Иначе берем первые 2 любых
-    return listing.features.slice(0, 2);
+    // Ищем в описании
+    if (listing.description) {
+      const commissionMatch = listing.description.match(/commission[:\s]+([^,.\n]+)/i);
+      if (commissionMatch) {
+        return commissionMatch[1].trim();
+      }
+    }
+    
+    return null;
   };
 
   // ===== Получение иконки транспорта =====
@@ -155,160 +178,155 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
     return sourceMap[source.toLowerCase()] || source;
   };
 
-  const imageUrl = getImageUrl();
   const title = getTitle();
-  const description = getDescription();
+  const address = getAddress();
   const price = getPrice();
-  const displayFeatures = getDisplayFeatures();
+  const commission = getCommission();
   const sourceName = getSourceName();
 
   return (
-    <div className="bg-white relative rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] w-full h-[448px]">
-      {/* Image */}
-      <div className="absolute h-[200px] left-0 rounded-tl-[12px] rounded-tr-[12px] top-0 w-full">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-tl-[12px] rounded-tr-[12px]">
-          <img 
-            alt={title} 
-            className="absolute h-full w-full object-cover" 
-            src={imageUrl} 
-          />
-        </div>
+    <div className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] w-full overflow-hidden">
+      {/* Image container with slider */}
+      <div 
+        className="relative h-[200px] w-full cursor-pointer"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <img 
+          src={currentImage}
+          alt={title}
+          className="w-full h-full object-cover"
+        />
+        
+        {/* Image indicators (dots) */}
+        {images.length > 1 && (
+          <div className="absolute bottom-[12px] left-0 right-0 flex justify-center gap-[6px]">
+            {images.map((_, index) => (
+              <div
+                key={index}
+                className={`w-[8px] h-[8px] rounded-full transition-all ${
+                  index === currentImageIndex 
+                    ? 'bg-blue-600 w-[24px]' 
+                    : 'bg-white/70'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Features chips */}
-      {displayFeatures.length > 0 && (
-        <div className="absolute flex flex-wrap gap-x-[8px] gap-y-[8px] left-[16px] top-[16px]">
-          {displayFeatures.map((feature, index) => (
-            <div 
-              key={index} 
-              className="bg-gray-100 box-border flex h-[36px] items-center justify-center px-[16px] py-[10px] rounded-[18px]"
-            >
-              <p className="font-medium leading-[20px] text-[14px] text-gray-700 text-nowrap whitespace-pre">
-                {feature}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Content */}
+      <div className="p-[16px]">
+        {/* Title: комнаты, метраж, этаж */}
+        <h3 className="font-semibold text-[18px] leading-[24px] text-gray-900 mb-[8px] truncate">
+          {title}
+        </h3>
 
-      {/* Title */}
-      <p className="absolute font-medium leading-[32px] left-[16px] text-[16px] text-gray-900 top-[216px] w-[274px]">
-        {title}
-      </p>
+        {/* Address */}
+        <p className="font-normal text-[14px] leading-[20px] text-gray-600 mb-[12px] truncate">
+          {address}
+        </p>
 
-      {/* Description */}
-      <p className="absolute font-normal leading-[20px] left-[16px] text-[12px] text-gray-700 top-[248px] w-[274px]">
-        {description}
-      </p>
+        {/* Price */}
+        <p className="font-bold text-[24px] leading-[32px] text-gray-900 mb-[8px]">
+          {price}
+        </p>
 
-      {/* Price */}
-      <p className="absolute font-semibold leading-[28px] left-[16px] text-[18px] text-gray-900 text-nowrap top-[304px] whitespace-pre">
-        {price}
-      </p>
+        {/* Commission (if available) */}
+        {commission && (
+          <p className="font-normal text-[14px] leading-[20px] text-gray-600 mb-[12px]">
+            Commission: {commission}
+          </p>
+        )}
 
-      {/* Metro stations or district */}
-      {listing.metroStations && listing.metroStations.length > 0 ? (
-        <>
-          {listing.metroStations.slice(0, 2).map((station, index) => {
-            const transport = getTransportIcon(station.distance);
-            return (
-              <div 
-                key={index}
-                className="absolute flex items-center justify-between left-[16px] right-[16px]"
-                style={{ top: `${344 + index * 28}px` }}
-              >
-                <div className="flex items-center gap-[6px]">
-                  {transport.icon}
-                  <p className="font-normal leading-[20px] text-[14px] text-gray-900">
-                    {station.name}
+        {/* Metro */}
+        {listing.metroStations && listing.metroStations.length > 0 && (
+          <div className="mb-[12px] space-y-[6px]">
+            {listing.metroStations.slice(0, 2).map((station, index) => {
+              const transport = getTransportIcon(station.distance);
+              return (
+                <div key={index} className="flex items-center gap-[8px]">
+                  <div className="flex items-center gap-[6px] flex-1">
+                    {transport.icon}
+                    <p className="font-normal text-[14px] leading-[20px] text-gray-900 truncate">
+                      {station.name}
+                    </p>
+                  </div>
+                  <p className="font-normal text-[14px] leading-[20px] text-gray-600">
+                    {station.distance}
                   </p>
                 </div>
-                <p className="font-normal leading-[20px] text-[14px] text-gray-700">
-                  {station.distance}
-                </p>
-              </div>
-            );
-          })}
-        </>
-      ) : listing.district ? (
-        <div className="absolute flex items-center gap-[8px] left-[16px] top-[344px]">
-          <p className="font-normal leading-[20px] text-[14px] text-gray-900">
-            {listing.district}
-          </p>
-        </div>
-      ) : null}
+              );
+            })}
+          </div>
+        )}
 
-      {/* Source */}
-      <div className="absolute left-[16px] top-[378px]">
-        <p className="font-normal leading-[20px] text-[12px] text-gray-500">
+        {/* Source */}
+        <p className="font-normal text-[12px] leading-[16px] text-gray-500 mb-[16px]">
           Source: {sourceName}
         </p>
-      </div>
 
-      {/* On the map button */}
-      <div 
-        className="absolute bg-blue-600 flex gap-[8px] items-center justify-center left-[16px] px-[16px] py-[4px] rounded-[8px] top-[404px] cursor-pointer hover:bg-blue-700 transition-colors"
-        onClick={() => onShowMap?.(listing.id)}
-      >
-        <div className="size-[20px]">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M10 11C11.6569 11 13 9.65685 13 8C13 6.34315 11.6569 5 10 5C8.34315 5 7 6.34315 7 8C7 9.65685 8.34315 11 10 11Z"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M10 19C13 16 17 12.4183 17 8C17 4.13401 13.866 1 10 1C6.13401 1 3 4.13401 3 8C3 12.4183 7 16 10 19Z"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        <p className="font-medium leading-[20px] text-[14px] text-white whitespace-pre">
-          On the map
-        </p>
-      </div>
+        {/* Action buttons */}
+        <div className="flex items-center justify-between">
+          {/* On the map button */}
+          <button
+            onClick={() => onShowMap?.(listing.id)}
+            className="bg-blue-600 px-[16px] py-[8px] rounded-[8px] flex items-center gap-[8px] hover:bg-blue-700 transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M10 11C11.6569 11 13 9.65685 13 8C13 6.34315 11.6569 5 10 5C8.34315 5 7 6.34315 7 8C7 9.65685 8.34315 11 10 11Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10 19C13 16 17 12.4183 17 8C17 4.13401 13.866 1 10 1C6.13401 1 3 4.13401 3 8C3 12.4183 7 16 10 19Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-medium text-[14px] text-white">On the map</span>
+          </button>
 
-      {/* Action icons */}
-      <div className="absolute flex gap-[12px] items-center right-[16px] top-[408px]">
-        {/* Heart icon */}
-        <div 
-          className="size-[20px] cursor-pointer hover:opacity-70 transition-opacity"
-          onClick={() => onFavoriteToggle?.(listing.id)}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M10 18L8.55 16.7C3.4 12.16 0 9.08 0 5.5C0 2.42 2.42 0 5.5 0C7.24 0 8.91 0.81 10 2.09C11.09 0.81 12.76 0 14.5 0C17.58 0 20 2.42 20 5.5C20 9.08 16.6 12.16 11.45 16.7L10 18Z"
-              fill="#9CA3AF"
-            />
-          </svg>
-        </div>
+          {/* Icon buttons */}
+          <div className="flex items-center gap-[12px]">
+            <button
+              onClick={() => onFavoriteToggle?.(listing.id)}
+              className="w-[20px] h-[20px] hover:opacity-70 transition-opacity"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M10 18L8.55 16.7C3.4 12.16 0 9.08 0 5.5C0 2.42 2.42 0 5.5 0C7.24 0 8.91 0.81 10 2.09C11.09 0.81 12.76 0 14.5 0C17.58 0 20 2.42 20 5.5C20 9.08 16.6 12.16 11.45 16.7L10 18Z"
+                  fill="#9CA3AF"
+                />
+              </svg>
+            </button>
 
-        {/* Flag icon */}
-        <div 
-          className="size-[20px] cursor-pointer hover:opacity-70 transition-opacity"
-          onClick={() => onFlag?.(listing.id)}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 1V19L18 10L3 1Z" fill="#9CA3AF" />
-          </svg>
-        </div>
+            <button
+              onClick={() => onFlag?.(listing.id)}
+              className="w-[20px] h-[20px] hover:opacity-70 transition-opacity"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 1V19L18 10L3 1Z" fill="#9CA3AF" />
+              </svg>
+            </button>
 
-        {/* Share icon */}
-        <div 
-          className="size-[20px] cursor-pointer hover:opacity-70 transition-opacity"
-          onClick={() => onShare?.(listing.id)}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="15" cy="5" r="3" fill="#9CA3AF" />
-            <circle cx="5" cy="10" r="3" fill="#9CA3AF" />
-            <circle cx="15" cy="15" r="3" fill="#9CA3AF" />
-            <path d="M7.5 11L12.5 14M12.5 6L7.5 9" stroke="#9CA3AF" strokeWidth="2" />
-          </svg>
+            <button
+              onClick={() => onShare?.(listing.id)}
+              className="w-[20px] h-[20px] hover:opacity-70 transition-opacity"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="15" cy="5" r="3" fill="#9CA3AF" />
+                <circle cx="5" cy="10" r="3" fill="#9CA3AF" />
+                <circle cx="15" cy="15" r="3" fill="#9CA3AF" />
+                <path d="M7.5 11L12.5 14M12.5 6L7.5 9" stroke="#9CA3AF" strokeWidth="2" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
