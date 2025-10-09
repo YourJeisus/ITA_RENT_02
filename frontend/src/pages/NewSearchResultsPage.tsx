@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { CircularProgress, Alert, Pagination, Box } from "@mui/material";
 import NewListingCard from "../components/search/NewListingCard/NewListingCard";
@@ -6,6 +6,8 @@ import NewFiltersSidebar from "../components/search/NewFiltersSidebar/NewFilters
 import NewFooter from "../components/new-home/NewFooter";
 import { useListingStore } from "../store/listingStore";
 import { FilterState } from "../types";
+import { MapContainer, TileLayer } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 const NewSearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -24,26 +26,34 @@ const NewSearchResultsPage: React.FC = () => {
   const totalPages = Math.ceil(totalListings / listingsPerPage);
 
   // Маппинг английских названий городов в итальянские
-  const cityMapping: { [key: string]: { id: string; name: string } } = {
-    rome: { id: "Roma", name: "Rome" },
-    milan: { id: "Milano", name: "Milan" },
-    florence: { id: "Firenze", name: "Florence" },
-    naples: { id: "Napoli", name: "Naples" },
-    turin: { id: "Torino", name: "Turin" },
-    venice: { id: "Venezia", name: "Venice" },
-    bologna: { id: "Bologna", name: "Bologna" },
+  const cityMapping: {
+    [key: string]: { id: string; name: string; coords: [number, number] };
+  } = {
+    rome: { id: "Roma", name: "Rome", coords: [41.9028, 12.4964] },
+    milan: { id: "Milano", name: "Milan", coords: [45.4642, 9.19] },
+    florence: { id: "Firenze", name: "Florence", coords: [43.7696, 11.2558] },
+    naples: { id: "Napoli", name: "Naples", coords: [40.8518, 14.2681] },
+    turin: { id: "Torino", name: "Turin", coords: [45.0703, 7.6869] },
+    venice: { id: "Venezia", name: "Venice", coords: [45.4408, 12.3155] },
+    bologna: { id: "Bologna", name: "Bologna", coords: [44.4949, 11.3426] },
     // По умолчанию, если город уже на итальянском
-    roma: { id: "Roma", name: "Rome" },
-    milano: { id: "Milano", name: "Milan" },
-    firenze: { id: "Firenze", name: "Florence" },
-    napoli: { id: "Napoli", name: "Naples" },
-    torino: { id: "Torino", name: "Turin" },
-    venezia: { id: "Venezia", name: "Venice" },
+    roma: { id: "Roma", name: "Rome", coords: [41.9028, 12.4964] },
+    milano: { id: "Milano", name: "Milan", coords: [45.4642, 9.19] },
+    firenze: { id: "Firenze", name: "Florence", coords: [43.7696, 11.2558] },
+    napoli: { id: "Napoli", name: "Naples", coords: [40.8518, 14.2681] },
+    torino: { id: "Torino", name: "Turin", coords: [45.0703, 7.6869] },
+    venezia: { id: "Venezia", name: "Venice", coords: [45.4408, 12.3155] },
   };
 
   const normalizeCity = (cityInput: string) => {
     const cityLower = cityInput?.toLowerCase() || "";
-    return cityMapping[cityLower] || { id: "Roma", name: "Rome" };
+    return (
+      cityMapping[cityLower] || {
+        id: "Roma",
+        name: "Rome",
+        coords: [41.9028, 12.4964] as [number, number],
+      }
+    );
   };
 
   useEffect(() => {
@@ -90,12 +100,17 @@ const NewSearchResultsPage: React.FC = () => {
   };
 
   const cityFromUrl = searchParams.get("city") || "rome";
-  const cityDisplay = normalizeCity(cityFromUrl).name;
+  const cityData = normalizeCity(cityFromUrl);
+  const cityDisplay = cityData.name;
+
+  const mapCenter = useMemo<[number, number]>(() => {
+    return cityData.coords;
+  }, [cityData]);
 
   return (
     <div className="bg-[#eaf4fd] min-h-screen">
       {/* Navbar */}
-      <nav className="bg-white h-[72px] flex items-center px-[312px] justify-between">
+      <nav className="bg-white h-[72px] flex items-center px-[160px] justify-between">
         <div
           className="font-bold text-[22px] text-blue-600 cursor-pointer"
           onClick={() => navigate("/")}
@@ -132,7 +147,7 @@ const NewSearchResultsPage: React.FC = () => {
         </div>
       </nav>
 
-      <div className="px-[312px] py-[48px]">
+      <div className="px-[160px] py-[48px]">
         {/* Breadcrumb */}
         <p className="font-normal text-[16px] leading-[24px] text-gray-600 mb-[16px]">
           Home / {cityDisplay} / Rent an apartment
@@ -175,6 +190,33 @@ const NewSearchResultsPage: React.FC = () => {
 
           {/* Listings grid */}
           <div className="flex-1">
+            <div className="relative rounded-[12px] shadow-[0px_4px_12px_rgba(0,0,0,0.04)] bg-white mb-[40px] overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/45 via-transparent to-white/35 z-[1]" />
+              <MapContainer
+                center={mapCenter}
+                zoom={12}
+                style={{ height: "140px", width: "100%" }}
+                scrollWheelZoom={false}
+                dragging={false}
+                doubleClickZoom={false}
+                zoomControl={false}
+                attributionControl={false}
+              >
+                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+              </MapContainer>
+              <div
+                className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                style={{ zIndex: 9999 }}
+              >
+                <button
+                  type="button"
+                  className="pointer-events-auto flex items-center justify-center bg-white border border-gray-200 px-[24px] py-[8px] rounded-[8px] shadow-[0px_4px_12px_rgba(0,0,0,0.04)] text-[16px] font-semibold text-gray-900"
+                  style={{ zIndex: 10000 }}
+                >
+                  View on map
+                </button>
+              </div>
+            </div>
             {isLoading && page === 1 ? (
               <div className="flex items-center justify-center py-[100px]">
                 <CircularProgress />
@@ -198,7 +240,6 @@ const NewSearchResultsPage: React.FC = () => {
                       key={listing.id}
                       listing={listing}
                       onFavoriteToggle={(id) => console.log("Favorite", id)}
-                      onFlag={(id) => console.log("Flag", id)}
                       onShare={(id) => console.log("Share", id)}
                       onShowMap={(id) => console.log("Show on map", id)}
                     />
