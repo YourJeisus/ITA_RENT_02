@@ -1,68 +1,101 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import {
-  City,
-  FilterState,
-  PropertyType,
-  TransactionType,
-  RoomOption,
-} from '../types';
+import { persist } from 'zustand/middleware';
 
-const initialFilters: FilterState = {
-  city: { id: 'rome', name: 'Рим' },
-  transactionType: 'rent',
-  propertyType: 'all',
-  rooms: null,
-  priceMin: null,
-  priceMax: null,
-  locationQuery: '',
-  roomOptions: [],
-  areaMin: null,
-  areaMax: null,
-  floorType: null,
-  selectedFeatures: null,
-  selectedLocations: null,
-};
+export type PropertyType = 'apartment' | 'room' | 'house';
+export type RoomType = 'studio' | '1' | '2' | '3' | '4' | '5+';
 
-interface FilterActions {
-  setCity: (city: City | null) => void;
-  setTransactionType: (type: TransactionType) => void;
-  setPropertyType: (type: PropertyType) => void;
-  setRooms: (rooms: number | null) => void;
-  setPriceMin: (price: number | null) => void;
-  setPriceMax: (price: number | null) => void;
-  setLocationQuery: (query: string) => void;
-  setRoomOptions: (options: RoomOption[]) => void;
-  setAreaMin: (area: number | null) => void;
-  setAreaMax: (area: number | null) => void;
-  setFloorType: (floorType: string[] | null) => void;
-  setSelectedFeatures: (features: string[] | null) => void;
-  setSelectedLocations: (locations: string[] | null) => void;
-  setAllFilters: (filters: Partial<FilterState>) => void;
-  resetFilters: () => void;
+export interface UserFilter {
+  id: string;
+  name: string;
+  city: string;
+  property_type: PropertyType[];
+  rooms: RoomType[];
+  price_min: string;
+  price_max: string;
+  min_area: string;
+  max_area: string;
+  no_commission: boolean;
+  pets_allowed: boolean;
+  children_allowed: boolean;
+  createdAt: string;
 }
 
-export const useFilterStore = create<FilterState & FilterActions>()(
-  devtools(
+interface FilterStore {
+  savedFilters: UserFilter[];
+  currentFilter: Partial<UserFilter>;
+  
+  // Actions
+  saveFilter: (filter: Omit<UserFilter, 'id' | 'createdAt'>) => void;
+  updateFilter: (id: string, filter: Partial<UserFilter>) => void;
+  deleteFilter: (id: string) => void;
+  setCurrentFilter: (filter: Partial<UserFilter>) => void;
+  loadFilter: (id: string) => void;
+  clearCurrentFilter: () => void;
+}
+
+const defaultFilter: Partial<UserFilter> = {
+  city: 'Rome',
+  property_type: [],
+  rooms: [],
+  price_min: '',
+  price_max: '',
+  min_area: '',
+  max_area: '',
+  no_commission: false,
+  pets_allowed: false,
+  children_allowed: false,
+};
+
+export const useFilterStore = create<FilterStore>()(
+  persist(
     (set, get) => ({
-      ...initialFilters,
-      setCity: (city) => set({ city }),
-      setTransactionType: (type) => set({ transactionType: type }),
-      setPropertyType: (type) => set({ propertyType: type }),
-      setRooms: (rooms) => set({ rooms }),
-      setPriceMin: (price) => set({ priceMin: price }),
-      setPriceMax: (price) => set({ priceMax: price }),
-      setLocationQuery: (query) => set({ locationQuery: query }),
-      setRoomOptions: (options) => set({ roomOptions: options }),
-      setAreaMin: (area) => set({ areaMin: area }),
-      setAreaMax: (area) => set({ areaMax: area }),
-      setFloorType: (floorType) => set({ floorType: floorType }),
-      setSelectedFeatures: (features) => set({ selectedFeatures: features }),
-      setSelectedLocations: (locations) =>
-        set({ selectedLocations: locations }),
-      setAllFilters: (filters) => set((state) => ({ ...state, ...filters })),
-      resetFilters: () => set(initialFilters),
+      savedFilters: [],
+      currentFilter: { ...defaultFilter },
+
+      saveFilter: (filter) => {
+        const newFilter: UserFilter = {
+          ...filter,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+        };
+        
+        set((state) => ({
+          savedFilters: [...state.savedFilters, newFilter],
+          currentFilter: newFilter,
+        }));
+      },
+
+      updateFilter: (id, updatedFilter) => {
+        set((state) => ({
+          savedFilters: state.savedFilters.map((filter) =>
+            filter.id === id ? { ...filter, ...updatedFilter } : filter
+          ),
+        }));
+      },
+
+      deleteFilter: (id) => {
+        set((state) => ({
+          savedFilters: state.savedFilters.filter((filter) => filter.id !== id),
+        }));
+      },
+
+      setCurrentFilter: (filter) => {
+        set({ currentFilter: filter });
+      },
+
+      loadFilter: (id) => {
+        const filter = get().savedFilters.find((f) => f.id === id);
+        if (filter) {
+          set({ currentFilter: filter });
+        }
+      },
+
+      clearCurrentFilter: () => {
+        set({ currentFilter: { ...defaultFilter } });
+      },
     }),
-    { name: 'FilterStore' }
+    {
+      name: 'filter-storage',
+    }
   )
 );

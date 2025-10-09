@@ -28,15 +28,15 @@ function App() {
 
       {/* Search page with new design without PageLayout (has its own navbar) */}
       <Route path="/search" element={<NewSearchResultsPage />} />
-      
+
       {/* New Auth pages without PageLayout (have their own header/footer) */}
       <Route path="/auth/signup" element={<SignUpPage />} />
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-      
+
       {/* Redirect old /auth to /auth/login */}
       <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
-      
+
       {/* Settings page with protection */}
       <Route
         path="/settings"
@@ -46,7 +46,7 @@ function App() {
           </ProtectedRoute>
         }
       />
-      
+
       <Route
         path="/filters"
         element={
