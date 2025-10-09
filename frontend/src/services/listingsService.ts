@@ -95,7 +95,7 @@ class ListingsService {
   // Конвертируем FilterState в параметры поиска
   convertFiltersToSearchParams(filters: FilterState): SearchParams {
     return {
-      city: filters.city?.name || undefined,
+      city: filters.city?.id || undefined,
       min_price: filters.priceMin || undefined,
       max_price: filters.priceMax || undefined,
       property_type:
