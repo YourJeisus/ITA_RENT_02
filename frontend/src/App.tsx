@@ -5,6 +5,7 @@ import NewSearchResultsPage from "./pages/NewSearchResultsPage";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import SettingsPage from "./pages/SettingsPage";
 import FiltersPage from "./pages/FiltersPage";
 import MapPage from "./pages/MapPage";
 import PageLayout from "./components/layout/PageLayout/PageLayout";
@@ -35,6 +36,16 @@ function App() {
       
       {/* Redirect old /auth to /auth/login */}
       <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+      
+      {/* Settings page with protection */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
       
       <Route
         path="/filters"

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { CircularProgress, Alert, Pagination, Box } from "@mui/material";
 import NewListingCard from "../components/search/NewListingCard/NewListingCard";
 import NewFiltersSidebar from "../components/search/NewFiltersSidebar/NewFiltersSidebar";
-import NewFooter from "../components/new-home/NewFooter";
+import AuthFooter from "../components/auth/AuthFooter";
 import { useListingStore } from "../store/listingStore";
 import { FilterState } from "../types";
 import { MapContainer, TileLayer } from "react-leaflet";
@@ -267,7 +267,7 @@ const NewSearchResultsPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <NewFooter />
+      <AuthFooter />
     </div>
   );
 };

@@ -7,7 +7,7 @@ import StepByStepSection from '../components/new-home/StepByStepSection';
 import CitiesSection from '../components/new-home/CitiesSection';
 import FAQSection from '../components/new-home/FAQSection';
 import CatSection from '../components/new-home/CatSection';
-import NewFooter from '../components/new-home/NewFooter';
+import AuthFooter from '../components/auth/AuthFooter';
 
 const NewHomePage: React.FC = () => {
   return (
@@ -20,7 +20,7 @@ const NewHomePage: React.FC = () => {
       <CitiesSection />
       <FAQSection />
       <CatSection />
-      <NewFooter />
+      <AuthFooter />
     </div>
   );
 };
