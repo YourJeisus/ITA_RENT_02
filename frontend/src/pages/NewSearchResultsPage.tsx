@@ -23,6 +23,29 @@ const NewSearchResultsPage: React.FC = () => {
 
   const totalPages = Math.ceil(totalListings / listingsPerPage);
 
+  // Маппинг английских названий городов в итальянские
+  const cityMapping: { [key: string]: { id: string; name: string } } = {
+    rome: { id: "Roma", name: "Rome" },
+    milan: { id: "Milano", name: "Milan" },
+    florence: { id: "Firenze", name: "Florence" },
+    naples: { id: "Napoli", name: "Naples" },
+    turin: { id: "Torino", name: "Turin" },
+    venice: { id: "Venezia", name: "Venice" },
+    bologna: { id: "Bologna", name: "Bologna" },
+    // По умолчанию, если город уже на итальянском
+    roma: { id: "Roma", name: "Rome" },
+    milano: { id: "Milano", name: "Milan" },
+    firenze: { id: "Firenze", name: "Florence" },
+    napoli: { id: "Napoli", name: "Naples" },
+    torino: { id: "Torino", name: "Turin" },
+    venezia: { id: "Venezia", name: "Venice" },
+  };
+
+  const normalizeCity = (cityInput: string) => {
+    const cityLower = cityInput?.toLowerCase() || "";
+    return cityMapping[cityLower] || { id: "Roma", name: "Rome" };
+  };
+
   useEffect(() => {
     // Собираем все параметры из URL
     const filtersFromUrl: any = {};
@@ -35,12 +58,12 @@ const NewSearchResultsPage: React.FC = () => {
       }
     });
 
+    // Нормализуем город
+    const cityData = normalizeCity(filtersFromUrl.city);
+
     // Преобразуем параметры в формат FilterState
     const filtersForStore: FilterState = {
-      city: {
-        id: filtersFromUrl.city || "roma",
-        name: filtersFromUrl.city || "Rome",
-      },
+      city: cityData,
       transactionType: "rent",
       propertyType: filtersFromUrl.property_type || undefined,
       rooms: filtersFromUrl.rooms ? filtersFromUrl.rooms.map(Number) : null,
@@ -66,7 +89,8 @@ const NewSearchResultsPage: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const city = searchParams.get("city") || "Rome";
+  const cityFromUrl = searchParams.get("city") || "rome";
+  const cityDisplay = normalizeCity(cityFromUrl).name;
 
   return (
     <div className="bg-[#eaf4fd] min-h-screen">
@@ -111,12 +135,12 @@ const NewSearchResultsPage: React.FC = () => {
       <div className="px-[312px] py-[48px]">
         {/* Breadcrumb */}
         <p className="font-normal text-[16px] leading-[24px] text-gray-600 mb-[16px]">
-          Home / {city} / Rent an apartment
+          Home / {cityDisplay} / Rent an apartment
         </p>
 
         {/* Title */}
         <h1 className="font-bold text-[36px] leading-[40px] text-gray-900 mb-[16px]">
-          Rent an apartment in {city}
+          Rent an apartment in {cityDisplay}
         </h1>
 
         {/* Count */}
