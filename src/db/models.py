@@ -46,6 +46,12 @@ class User(Base):
     whatsapp_instance_id: Mapped[Optional[str]] = mapped_column(String(100))
     whatsapp_enabled: Mapped[bool] = mapped_column(default=False, index=True)
     
+    # Настройки уведомлений
+    email_notifications_enabled: Mapped[bool] = mapped_column(default=True, index=True)
+    telegram_notifications_enabled: Mapped[bool] = mapped_column(default=True, index=True)
+    email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    email_last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    
     # Подписка (упрощенная модель для MVP)
     subscription_type: Mapped[str] = mapped_column(
         String(50), default="free", index=True
@@ -117,6 +123,11 @@ class Filter(Base):
     notification_enabled: Mapped[bool] = mapped_column(default=True)
     notification_frequency_hours: Mapped[int] = mapped_column(default=24)  # Частота в часах
     last_notification_sent: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    
+    # Каналы уведомлений
+    notify_telegram: Mapped[bool] = mapped_column(default=True)
+    notify_email: Mapped[bool] = mapped_column(default=False)
+    notify_whatsapp: Mapped[bool] = mapped_column(default=False)
     
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(

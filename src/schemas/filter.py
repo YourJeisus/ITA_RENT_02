@@ -21,6 +21,9 @@ class FilterBase(BaseModel):
     pets_allowed: Optional[bool] = None
     notification_enabled: bool = True
     notification_frequency_hours: int = 24
+    notify_telegram: bool = True
+    notify_email: bool = False
+    notify_whatsapp: bool = False
 
 
 class FilterCreate(FilterBase):
@@ -94,6 +97,9 @@ class FilterUpdate(BaseModel):
     is_active: Optional[bool] = None
     notification_enabled: Optional[bool] = None
     notification_frequency_hours: Optional[int] = None
+    notify_telegram: Optional[bool] = None
+    notify_email: Optional[bool] = None
+    notify_whatsapp: Optional[bool] = None
     
     @field_validator('name')
     @classmethod

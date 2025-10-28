@@ -371,7 +371,7 @@ class NotificationService:
     async def send_notification_for_filter(self, user: User, filter_obj: Filter, listings: List[Listing]) -> bool:
         """
         Отправка уведомлений пользователю о новых объявлениях
-        Поддерживает Telegram и WhatsApp
+        Поддерживает Telegram, WhatsApp и Email
         """
         try:
             from src.core.config import settings
@@ -381,9 +381,12 @@ class NotificationService:
             
             telegram_success = False
             whatsapp_success = False
+            email_success = False
             
-            # Отправка через Telegram (если настроен)
-            if user.telegram_chat_id:
+            # Отправка через Telegram (если включен в фильтре и у пользователя)
+            if (filter_obj.notify_telegram and 
+                user.telegram_chat_id and 
+                user.telegram_notifications_enabled):
                 try:
                     from src.services.telegram_bot import send_listing_notification
                     
@@ -414,8 +417,60 @@ class NotificationService:
                 except Exception as e:
                     logger.error(f"Ошибка отправки Telegram уведомлений: {e}")
             
-            # Отправка через WhatsApp (если настроен и включен)
-            if (user.whatsapp_phone and user.whatsapp_enabled and 
+            # Отправка через Email (если включен в фильтре и у пользователя)
+            if (filter_obj.notify_email and 
+                user.email and 
+                user.email_notifications_enabled):
+                try:
+                    from src.services.email_service import email_service
+                    from datetime import datetime, timedelta
+                    
+                    # Проверяем, не отправляли ли мы недавно email (защита от спама)
+                    can_send_email = True
+                    if user.email_last_sent_at:
+                        # Минимум 1 час между email уведомлениями
+                        time_since_last = datetime.now(timezone.utc).replace(tzinfo=None) - user.email_last_sent_at
+                        if time_since_last < timedelta(hours=1):
+                            can_send_email = False
+                            logger.info(f"⏰ Email для {user.email} пропущен - слишком рано (прошло {time_since_last})")
+                    
+                    if can_send_email and email_service.is_enabled():
+                        # Конвертируем объекты Listing в словари для email
+                        listings_data = []
+                        for listing in listings[:10]:  # Email: максимум 10 объявлений
+                            listings_data.append({
+                                'title': listing.title,
+                                'price': listing.price,
+                                'address': listing.address,
+                                'city': listing.city,
+                                'rooms': listing.rooms,
+                                'area': listing.area,
+                                'url': listing.url,
+                                'source': listing.source
+                            })
+                        
+                        email_sent = await email_service.send_listing_notification_email(
+                            to_email=user.email,
+                            listings=listings_data,
+                            filter_name=filter_obj.name
+                        )
+                        
+                        email_success = email_sent
+                        if email_success:
+                            # Обновляем время последней отправки email
+                            db = self.get_db()
+                            user.email_last_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                            db.add(user)
+                            db.commit()
+                            logger.info(f"📧 Email: отправлено уведомление с {len(listings_data)} объявлениями пользователю {user.email}")
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка отправки Email уведомлений: {e}")
+            
+            # Отправка через WhatsApp (если включен в фильтре и у пользователя)
+            if (filter_obj.notify_whatsapp and
+                user.whatsapp_phone and 
+                user.whatsapp_enabled and 
                 settings.WHATSAPP_ENABLED):
                 try:
                     from src.services.whatsapp_service import send_whatsapp_listing_notification
@@ -453,7 +508,7 @@ class NotificationService:
                     logger.error(f"Ошибка отправки WhatsApp уведомлений: {e}")
             
             # Считаем успехом если хотя бы один канал сработал
-            success = telegram_success or whatsapp_success
+            success = telegram_success or whatsapp_success or email_success
             
             if success:
                 db = self.get_db()
@@ -486,6 +541,8 @@ class NotificationService:
                     channels = []
                     if telegram_success:
                         channels.append("Telegram")
+                    if email_success:
+                        channels.append("Email")
                     if whatsapp_success:
                         channels.append("WhatsApp")
                     
@@ -511,10 +568,11 @@ class NotificationService:
         debug_mode = settings.DEBUG_NOTIFICATIONS
         
         # Проверяем наличие хотя бы одного способа связи
-        has_telegram = bool(user.telegram_chat_id)
+        has_telegram = bool(user.telegram_chat_id and user.telegram_notifications_enabled)
+        has_email = bool(user.email and user.email_notifications_enabled)
         has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
         
-        if not has_telegram and not has_whatsapp:
+        if not has_telegram and not has_email and not has_whatsapp:
             if debug_mode:
                 logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных способов уведомлений")
             return 0

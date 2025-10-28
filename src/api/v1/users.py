@@ -98,4 +98,106 @@ def get_subscription_limits(subscription_type: str) -> dict:
             "notification_interval_hours": 1
         }
     }
-    return limits.get(subscription_type, limits["free"]) 
+    return limits.get(subscription_type, limits["free"])
+
+
+@router.get("/notifications/settings")
+def get_notification_settings(
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Получение настроек уведомлений пользователя
+    """
+    return {
+        "email_notifications_enabled": current_user.email_notifications_enabled,
+        "telegram_notifications_enabled": current_user.telegram_notifications_enabled,
+        "has_telegram": bool(current_user.telegram_chat_id),
+        "has_whatsapp": bool(current_user.whatsapp_phone),
+        "whatsapp_enabled": current_user.whatsapp_enabled,
+        "email_verified_at": current_user.email_verified_at,
+        "email_last_sent_at": current_user.email_last_sent_at
+    }
+
+
+@router.put("/notifications/settings")
+def update_notification_settings(
+    settings_update: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Обновление настроек уведомлений пользователя
+    """
+    try:
+        # Обновляем только переданные поля
+        if "email_notifications_enabled" in settings_update:
+            current_user.email_notifications_enabled = settings_update["email_notifications_enabled"]
+        
+        if "telegram_notifications_enabled" in settings_update:
+            current_user.telegram_notifications_enabled = settings_update["telegram_notifications_enabled"]
+        
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"Notification settings updated for user: {current_user.email}")
+        
+        return {
+            "success": True,
+            "email_notifications_enabled": current_user.email_notifications_enabled,
+            "telegram_notifications_enabled": current_user.telegram_notifications_enabled
+        }
+    except Exception as e:
+        logger.error(f"Error updating notification settings: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при обновлении настроек уведомлений"
+        )
+
+
+@router.post("/notifications/test-email")
+async def send_test_email_notification(
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    Отправка тестового email уведомления
+    """
+    if not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email не указан"
+        )
+    
+    if not current_user.email_notifications_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email уведомления отключены"
+        )
+    
+    try:
+        from src.services.email_service import email_service
+        
+        if not email_service.is_enabled():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Email сервис не настроен"
+            )
+        
+        success = await email_service.send_test_email(current_user.email)
+        
+        if success:
+            return {"status": "sent", "message": "Тестовое email уведомление отправлено"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Не удалось отправить email"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending test email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при отправке тестового email"
+        ) 

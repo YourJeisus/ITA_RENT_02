@@ -31,6 +31,8 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     telegram_username: Optional[str] = None
+    email_notifications_enabled: Optional[bool] = None
+    telegram_notifications_enabled: Optional[bool] = None
 
 
 class UserInDBBase(UserBase):
@@ -41,6 +43,12 @@ class UserInDBBase(UserBase):
     subscription_type: str
     telegram_chat_id: Optional[str] = None
     telegram_username: Optional[str] = None
+    whatsapp_phone: Optional[str] = None
+    whatsapp_enabled: bool = False
+    email_notifications_enabled: bool = True
+    telegram_notifications_enabled: bool = True
+    email_verified_at: Optional[datetime] = None
+    email_last_sent_at: Optional[datetime] = None
     subscription_expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -63,6 +71,13 @@ class UserResponse(BaseModel):
     last_name: Optional[str] = None
     subscription_type: str
     is_active: bool
+    telegram_chat_id: Optional[str] = None
+    telegram_username: Optional[str] = None
+    whatsapp_phone: Optional[str] = None
+    whatsapp_enabled: bool = False
+    email_notifications_enabled: bool = True
+    telegram_notifications_enabled: bool = True
+    email_verified_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
