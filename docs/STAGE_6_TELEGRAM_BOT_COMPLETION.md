@@ -52,7 +52,7 @@
 #### Запуск по расписанию
 
 - [x] Cron скрипт `cron_notifications.py`
-- [x] Диспетчер уведомлений `run_notification_dispatcher.py`
+- [x] Диспетчер уведомлений `scripts/run_notification_dispatcher.py`
 - [x] Проверка каждые 30 минут (настраивается)
 - [x] Ограничения по частоте согласно подписке
 
@@ -66,9 +66,9 @@
 
 ### Скрипты запуска
 
-- `run_telegram_bot.py` - запуск бота для разработки и production
-- `run_notification_dispatcher.py` - запуск диспетчера уведомлений
-- `cron_notifications.py` - cron задача для автоматических уведомлений
+- `scripts/run_telegram_bot.py` - запуск бота для разработки и production
+- `scripts/run_notification_dispatcher.py` - запуск диспетчера уведомлений
+- `scripts/cron_notifications.py` - cron задача для автоматических уведомлений
 
 ### Тестирование и документация
 
@@ -150,7 +150,7 @@ POST   /api/v1/telegram/webhook           # Webhook для production
 
 ### Ручное тестирование
 
-1. Запуск бота: `python run_telegram_bot.py`
+1. Запуск бота: `python scripts/run_telegram_bot.py`
 2. Команды в Telegram: `/start`, `/help`, `/register email`
 3. Тестирование уведомлений: `python test_telegram_system.py`
 
@@ -160,10 +160,10 @@ POST   /api/v1/telegram/webhook           # Webhook для production
 
 ```bash
 # Запуск бота
-python run_telegram_bot.py
+python scripts/run_telegram_bot.py
 
 # Запуск диспетчера уведомлений
-python run_notification_dispatcher.py
+python scripts/run_notification_dispatcher.py
 
 # Тестирование системы
 python test_telegram_system.py
@@ -202,7 +202,7 @@ python test_telegram_system.py
 
 1. Настройте переменную `TELEGRAM_BOT_TOKEN` в `.env`
 2. Запустите API: `uvicorn src.main:app`
-3. Запустите бота: `python run_telegram_bot.py`
+3. Запустите бота: `python scripts/run_telegram_bot.py`
 4. Протестируйте: `python test_telegram_system.py`
 
 ### Для пользователей

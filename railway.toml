@@ -46,7 +46,7 @@ build.dockerfilePath = "Dockerfile.prod"
 build.buildCommand = "echo 'Telegram bot service'"
 
 [services.telegram-bot.deploy]
-startCommand = "python run_telegram_bot.py"
+startCommand = "python scripts/run_telegram_bot.py"
 healthcheckPath = ""
 healthcheckTimeout = 300
 restartPolicyType = "always"
@@ -65,7 +65,7 @@ build.dockerfilePath = "Dockerfile.prod"
 build.buildCommand = "echo 'Notification worker service'"
 
 [services.notification-worker.deploy]
-startCommand = "python run_notification_worker.py"
+startCommand = "python scripts/run_notification_worker.py"
 healthcheckPath = ""
 healthcheckTimeout = 300
 restartPolicyType = "always"

@@ -21,7 +21,7 @@ alembic upgrade head
 2. Проверить что constraint удален:
 
 ```bash
-python debug_system_status.py
+python scripts/debug_system_status.py
 ```
 
 ### 2. Мало объявлений с некоторых источников
@@ -41,7 +41,7 @@ python test_single_scraper.py all
 **Проверить статистику БД:**
 
 ```bash
-python debug_system_status.py
+python scripts/debug_system_status.py
 ```
 
 ### 3. Уведомления не приходят
@@ -50,10 +50,10 @@ python debug_system_status.py
 
 ```bash
 # Полная диагностика системы
-python debug_system_status.py
+python scripts/debug_system_status.py
 
 # Тест уведомлений отдельно
-python run_notification_worker.py
+python scripts/run_notification_worker.py
 ```
 
 **Проверить:**
@@ -73,7 +73,7 @@ python run_notification_worker.py
 
 ## Диагностические скрипты
 
-### `debug_system_status.py`
+### `scripts/debug_system_status.py`
 
 Полная диагностика системы:
 
@@ -83,7 +83,7 @@ python run_notification_worker.py
 - Тест системы уведомлений
 
 ```bash
-python debug_system_status.py
+python scripts/debug_system_status.py
 ```
 
 ### `test_single_scraper.py`
@@ -100,12 +100,12 @@ python test_single_scraper.py subito
 python test_single_scraper.py all
 ```
 
-### `run_notification_worker.py`
+### `scripts/run_notification_worker.py`
 
 Запуск worker уведомлений с диагностикой:
 
 ```bash
-python run_notification_worker.py
+python scripts/run_notification_worker.py
 ```
 
 ## Режим отладки

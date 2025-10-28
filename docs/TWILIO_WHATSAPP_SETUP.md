@@ -163,10 +163,10 @@ python test_twilio_whatsapp.py
 
 ```bash
 # В режиме отладки
-DEBUG_NOTIFICATIONS=true python run_whatsapp_worker.py
+DEBUG_NOTIFICATIONS=true python scripts/run_whatsapp_worker.py
 
 # В обычном режиме
-python run_whatsapp_worker.py
+python scripts/run_whatsapp_worker.py
 ```
 
 ### 3. Запуск API сервера:
@@ -271,7 +271,7 @@ WHATSAPP_NOTIFICATION_INTERVAL_SECONDS=1800
 
 ```bash
 # Запуск с подробными логами
-DEBUG_NOTIFICATIONS=true python run_whatsapp_worker.py
+DEBUG_NOTIFICATIONS=true python scripts/run_whatsapp_worker.py
 
 # Поиск ошибок в логах
 grep "ERROR" logs/whatsapp_worker.log
@@ -348,7 +348,7 @@ curl -u YOUR_ACCOUNT_SID:YOUR_AUTH_TOKEN \
 После успешной настройки Twilio:
 
 1. ✅ **Протестируйте отправку** через `test_twilio_whatsapp.py`
-2. ✅ **Запустите worker** `python run_whatsapp_worker.py`
+2. ✅ **Запустите worker** `python scripts/run_whatsapp_worker.py`
 3. ✅ **Настройте пользователей** через веб-интерфейс
 4. ✅ **Мониторьте логи** и статистику
 5. ✅ **Планируйте переход** на production при необходимости

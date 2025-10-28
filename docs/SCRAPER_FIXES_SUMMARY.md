@@ -36,7 +36,7 @@
 
 ## Новые диагностические инструменты
 
-### 1. 🔍 `debug_system_status.py`
+### 1. 🔍 `scripts/debug_system_status.py`
 
 Полная диагностика системы:
 
@@ -93,7 +93,7 @@ alembic upgrade head
 2. **Проверить систему:**
 
 ```bash
-python debug_system_status.py
+python scripts/debug_system_status.py
 ```
 
 3. **Протестировать скраперы:**
@@ -106,7 +106,7 @@ python test_single_scraper.py all
 
 ```bash
 export DEBUG_NOTIFICATIONS=true
-python run_notification_worker.py
+python scripts/run_notification_worker.py
 ```
 
 ## Ожидаемые улучшения

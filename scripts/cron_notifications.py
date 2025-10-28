@@ -4,19 +4,21 @@ CRON задача для автоматической отправки увед�
 Запускается каждые 30 минут для проверки новых объявлений
 """
 import asyncio
-import os
 import sys
 import logging
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Добавляем корневую папку в Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from src.services.notification_service import run_notification_dispatcher
 
 # Загружаем переменные окружения
-load_dotenv()
+load_dotenv(dotenv_path=ROOT_DIR / '.env')
 
 # Настройка логирования для cron (краткий формат)
 logging.basicConfig(

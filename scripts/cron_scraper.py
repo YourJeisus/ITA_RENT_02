@@ -4,10 +4,12 @@
 Запускает парсинг Immobiliare.it
 """
 import sys
-import os
+from pathlib import Path
 
 # Добавляем корень проекта в путь
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 # Запускаем парсинг
 if __name__ == "__main__":

@@ -79,10 +79,10 @@ alembic upgrade head
 
 ```bash
 # Запуск в production
-python run_whatsapp_worker.py
+python scripts/run_whatsapp_worker.py
 
 # Запуск в режиме отладки
-DEBUG_NOTIFICATIONS=true python run_whatsapp_worker.py
+DEBUG_NOTIFICATIONS=true python scripts/run_whatsapp_worker.py
 ```
 
 ### 3. Запуск в Docker
@@ -101,7 +101,7 @@ services:
       - WHATSAPP_API_URL=${WHATSAPP_API_URL}
       - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
-    command: python run_whatsapp_worker.py
+    command: python scripts/run_whatsapp_worker.py
     depends_on:
       - api
     restart: unless-stopped
@@ -258,7 +258,7 @@ export DEBUG_NOTIFICATIONS=true
 export WHATSAPP_NOTIFICATION_INTERVAL_SECONDS=60
 
 # Запустить worker в режиме отладки
-python run_whatsapp_worker.py
+python scripts/run_whatsapp_worker.py
 ```
 
 ### Проверка статуса через API

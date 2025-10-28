@@ -5,14 +5,14 @@
 """
 import os
 import sys
-import time
 import asyncio
 import logging
-import subprocess
 from pathlib import Path
 
 # Добавляем корневую папку в путь
-sys.path.append(str(Path(__file__).parent))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 # Настройка логирования
 logging.basicConfig(
@@ -25,7 +25,7 @@ def load_environment():
     """Загрузка переменных окружения"""
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(dotenv_path=ROOT_DIR / '.env')
         logger.info("✅ Переменные окружения загружены")
     except ImportError:
         logger.info("📝 python-dotenv не установлен, используем системные переменные")

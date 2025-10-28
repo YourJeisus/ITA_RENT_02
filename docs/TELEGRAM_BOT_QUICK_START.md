@@ -45,7 +45,7 @@ DATABASE_URL=sqlite:///./ita_rent.db  # или PostgreSQL URL
 uvicorn src.main:app --reload
 
 # В новом терминале - запуск бота
-python run_telegram_bot.py
+python scripts/run_telegram_bot.py
 
 # В третьем терминале - тестирование
 python test_telegram_system.py

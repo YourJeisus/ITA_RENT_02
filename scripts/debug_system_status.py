@@ -9,14 +9,16 @@
 - Последние объявления
 
 Использование:
-    python debug_system_status.py
+    python scripts/debug_system_status.py
 """
 import sys
 import asyncio
 from pathlib import Path
 
 # Добавляем корень проекта в путь
-sys.path.insert(0, str(Path(__file__).parent))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from src.db.database import SessionLocal
 from src.services.scraping_service import ScrapingService

@@ -59,7 +59,7 @@
 
 #### 6. WhatsApp Worker (✅ Готово)
 
-- **Файл**: `run_whatsapp_worker.py`
+- **Файл**: `scripts/run_whatsapp_worker.py`
 - **Особенности**:
   - Независимый worker процесс
   - Настраиваемые интервалы уведомлений
@@ -168,7 +168,7 @@ alembic upgrade head
 python -m uvicorn src.main:app --reload
 
 # 3. Запустить WhatsApp worker
-python run_whatsapp_worker.py
+python scripts/run_whatsapp_worker.py
 
 # 4. Протестировать
 python test_whatsapp_integration.py

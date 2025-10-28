@@ -112,7 +112,7 @@ DEBUG_NOTIFICATIONS=true
 ### **1. WhatsApp Worker:**
 
 ```bash
-python run_whatsapp_worker.py
+python scripts/run_whatsapp_worker.py
 ```
 
 _Worker запущен и работает в фоне_

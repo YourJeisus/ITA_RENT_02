@@ -12,7 +12,9 @@ import sys
 from pathlib import Path
 
 # Добавляем корень проекта в путь
-sys.path.insert(0, str(Path(__file__).parent))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from src.db.database import SessionLocal
 from src.db.models import User, Filter, Listing, SentNotification

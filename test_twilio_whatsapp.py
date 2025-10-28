@@ -254,7 +254,7 @@ async def main():
         logger.info("   Twilio WhatsApp интеграция работает корректно!")
         logger.info("")
         logger.info("📋 СЛЕДУЮЩИЕ ШАГИ:")
-        logger.info("1. 🚀 Запустите WhatsApp worker: python run_whatsapp_worker.py")
+        logger.info("1. 🚀 Запустите WhatsApp worker: python scripts/run_whatsapp_worker.py")
         logger.info("2. 🌐 Запустите API сервер: uvicorn src.main:app --reload")
         logger.info("3. 📱 Настройте пользователей через API")
     else:

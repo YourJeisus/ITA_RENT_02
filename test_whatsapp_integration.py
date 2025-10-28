@@ -350,7 +350,7 @@ async def main():
     logger.info("📋 ДАЛЬНЕЙШИЕ ДЕЙСТВИЯ:")
     logger.info("1. Настройте WhatsApp Business API у провайдера")
     logger.info("2. Обновите переменные окружения в .env файле")
-    logger.info("3. Запустите WhatsApp worker: python run_whatsapp_worker.py")
+    logger.info("3. Запустите WhatsApp worker: python scripts/run_whatsapp_worker.py")
     logger.info("4. Протестируйте через API: POST /api/v1/whatsapp/test")
     logger.info("5. Настройте пользователей через веб-интерфейс")
     

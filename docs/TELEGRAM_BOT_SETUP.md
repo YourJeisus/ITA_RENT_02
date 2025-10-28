@@ -47,10 +47,10 @@ filters - Список ваших фильтров поиска
 
 ```bash
 # Запуск бота в polling режиме
-python run_telegram_bot.py
+python scripts/run_telegram_bot.py
 
 # Запуск диспетчера уведомлений (тестирование)
-python run_notification_dispatcher.py
+python scripts/run_notification_dispatcher.py
 ```
 
 ### Production (Railway)
@@ -164,7 +164,7 @@ POST /api/v1/telegram/webhook
 
 ```bash
 # Запустите бота локально
-python run_telegram_bot.py
+python scripts/run_telegram_bot.py
 
 # В Telegram:
 /start
@@ -178,7 +178,7 @@ python run_telegram_bot.py
 
 ```bash
 # Запустите диспетчер уведомлений
-python run_notification_dispatcher.py
+python scripts/run_notification_dispatcher.py
 
 # Или через API (если аккаунт привязан)
 curl -X POST "http://localhost:8000/api/v1/telegram/test-notification" \
@@ -214,7 +214,7 @@ python cron_notifications.py
 
    ```bash
    # Проверьте диспетчер
-   python run_notification_dispatcher.py
+   python scripts/run_notification_dispatcher.py
 
    # Проверьте привязку аккаунта
    curl -X GET "http://localhost:8000/api/v1/telegram/status" \
@@ -261,7 +261,7 @@ python cron_notifications.py
 
    # Локально
    pkill -f run_telegram_bot.py
-   python run_telegram_bot.py
+   python scripts/run_telegram_bot.py
    ```
 
 ### Миграция данных
