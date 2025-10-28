@@ -200,4 +200,306 @@ async def send_test_email_notification(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при отправке тестового email"
+        )
+
+
+# ========== EMAIL CHANGE ==========
+
+import secrets
+import string
+from datetime import datetime, timedelta
+
+def generate_verification_code(length: int = 6) -> str:
+    """Генерация 6-значного кода верификации"""
+    digits = string.digits
+    return ''.join(secrets.choice(digits) for _ in range(length))
+
+
+@router.post("/email/change-request")
+async def request_email_change(
+    new_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    Запрос на смену email - отправляет код верификации на новый email
+    """
+    if not new_email or "@" not in new_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный email адрес"
+        )
+    
+    if new_email == current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Новый email совпадает с текущим"
+        )
+    
+    # Проверяем что такой email еще не занят
+    existing = db.query(User).filter(User.email == new_email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Этот email уже зарегистрирован"
+        )
+    
+    try:
+        from src.services.email_service import email_service
+        
+        if not email_service.is_enabled():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Email сервис не настроен"
+            )
+        
+        # Генерируем код верификации
+        code = generate_verification_code()
+        
+        # Сохраняем временные данные (в реальном приложении использовать Redis)
+        # Для MVP хранним в памяти с временем истечения
+        if not hasattr(current_user, '_email_change_requests'):
+            current_user._email_change_requests = {}
+        
+        current_user._email_change_requests[new_email] = {
+            'code': code,
+            'expires_at': datetime.now() + timedelta(minutes=15)
+        }
+        
+        # Отправляем код на новый email
+        subject = "🔐 ITA Rent: Код подтверждения смены email"
+        body = f"""
+Привет!
+
+Вы запросили смену email адреса на сервисе ITA Rent.
+
+Ваш код подтверждения: {code}
+
+Код действителен 15 минут.
+
+Если это были не вы, игнорируйте это письмо.
+
+С уважением,
+Команда ITA Rent
+        """
+        
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 500px; margin: 0 auto;">
+                <h2>🔐 Код подтверждения смены email</h2>
+                <p>Вы запросили смену email адреса на сервисе ITA Rent.</p>
+                
+                <div style="background: #f0f0f0; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{code}</p>
+                </div>
+                
+                <p>Код действителен <strong>15 минут</strong>.</p>
+                <p>Если это были не вы, игнорируйте это письмо.</p>
+                
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                <p style="font-size: 12px; color: #666;">
+                    С уважением,<br>
+                    <strong>Команда ITA Rent</strong>
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        success = await email_service.send_email(new_email, subject, body, html_body)
+        
+        if success:
+            return {
+                "status": "code_sent",
+                "message": f"Код верификации отправлен на {new_email}",
+                "new_email": new_email
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Не удалось отправить код верификации"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error requesting email change: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при запросе смены email"
+        )
+
+
+@router.post("/email/change-confirm")
+def confirm_email_change(
+    new_email: str,
+    code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    Подтверждение смены email по коду верификации
+    """
+    if not code or len(code) != 6 or not code.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный код верификации"
+        )
+    
+    try:
+        # Проверяем код
+        if not hasattr(current_user, '_email_change_requests') or new_email not in current_user._email_change_requests:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Запрос смены email не найден. Начните заново."
+            )
+        
+        request_data = current_user._email_change_requests[new_email]
+        
+        # Проверяем истечение времени
+        if datetime.now() > request_data['expires_at']:
+            del current_user._email_change_requests[new_email]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Код верификации истек. Запросите новый код."
+            )
+        
+        # Проверяем код
+        if request_data['code'] != code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный код верификации"
+            )
+        
+        # Обновляем email
+        old_email = current_user.email
+        current_user.email = new_email
+        current_user.email_verified_at = datetime.now()
+        
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        
+        # Удаляем использованный запрос
+        del current_user._email_change_requests[new_email]
+        
+        logger.info(f"Email changed for user {current_user.id}: {old_email} -> {new_email}")
+        
+        return {
+            "status": "success",
+            "message": "Email успешно изменен",
+            "new_email": new_email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirming email change: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при подтверждении смены email"
+        )
+
+
+# ========== TELEGRAM LINKING ==========
+
+@router.post("/telegram/link")
+def link_telegram_account(
+    code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    Привязка аккаунта к Telegram через код из бота
+    
+    Пользователь:
+    1. Пишет боту /start
+    2. Получает код связки
+    3. Вводит код здесь
+    4. Аккаунт привязывается
+    """
+    if not code or len(code) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный код"
+        )
+    
+    try:
+        # Получаем данные о коде из бота (нужно передать через глобальное хранилище или Redis)
+        # Для MVP используем простой механизм - бот хранит коды в памяти
+        # В production использовать Redis
+        
+        from src.services.telegram_linking_service import telegram_linking_service
+        
+        linking_data = telegram_linking_service.get_code(code)
+        
+        if not linking_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Код не найден или истек"
+            )
+        
+        # Обновляем пользователя с Telegram данными
+        current_user.telegram_chat_id = str(linking_data['chat_id'])
+        current_user.telegram_username = linking_data['telegram_username']
+        current_user.telegram_notifications_enabled = True  # Включаем по умолчанию
+        
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        
+        # Удаляем использованный код
+        telegram_linking_service.remove_code(code)
+        
+        logger.info(f"✅ Telegram привязан к аккаунту {current_user.email} (ID: {linking_data['chat_id']})")
+        
+        return {
+            "status": "success",
+            "message": "Telegram успешно привязан к аккаунту",
+            "telegram_username": current_user.telegram_username
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error linking telegram: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при привязке Telegram"
+        )
+
+
+@router.post("/telegram/unlink")
+def unlink_telegram_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    """
+    Отвязка Telegram от аккаунта
+    """
+    try:
+        current_user.telegram_chat_id = None
+        current_user.telegram_username = None
+        
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        
+        logger.info(f"✅ Telegram отвязан от аккаунта {current_user.email}")
+        
+        return {
+            "status": "success",
+            "message": "Telegram успешно отвязан от аккаунта"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error unlinking telegram: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при отвязке Telegram"
         ) 

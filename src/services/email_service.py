@@ -76,13 +76,16 @@ class EmailService:
                 html_part = MIMEText(html_body, 'html', 'utf-8')
                 message.attach(html_part)
             
-            # Отправляем в отдельном потоке чтобы не блокировать
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
-                self._send_smtp_message,
-                message
-            )
+            # Подключаемся к SMTP серверу и отправляем
+            try:
+                server = smtplib.SMTP(self.smtp_host, int(self.smtp_port))
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(message)
+                server.quit()
+            except Exception as smtp_error:
+                logger.error(f"❌ SMTP ошибка для {to_email}: {smtp_error}")
+                return False
             
             logger.info(f"📧 Email отправлен на {to_email}: {subject}")
             return True
@@ -94,12 +97,16 @@ class EmailService:
     def _send_smtp_message(self, message: MIMEMultipart):
         """
         Синхронная отправка через SMTP
-        Вызывается из run_in_executor
+        (Больше не используется, но оставляем для совместимости)
         """
-        with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-            server.starttls()
-            server.login(self.smtp_username, self.smtp_password)
-            server.send_message(message)
+        try:
+            with smtplib.SMTP(self.smtp_host, int(self.smtp_port)) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(message)
+        except Exception as e:
+            logger.error(f"❌ SMTP сервис ошибка: {e}")
+            raise
     
     async def send_listing_notification_email(
         self,

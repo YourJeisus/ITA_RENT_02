@@ -30,6 +30,19 @@ const SettingsPage: React.FC = () => {
   const [subscriptionsExpanded, setSubscriptionsExpanded] = useState(false);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
 
+  // Email change states
+  const [emailChangeMode, setEmailChangeMode] = useState<'idle' | 'enter-email' | 'verify-code'>('idle');
+  const [newEmail, setNewEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false);
+  const [emailChangeMessage, setEmailChangeMessage] = useState('');
+
+  // Telegram linking states
+  const [telegramCode, setTelegramCode] = useState('');
+  const [telegramCodeInput, setTelegramCodeInput] = useState('');
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramMessage, setTelegramMessage] = useState('');
+
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -134,11 +147,94 @@ const SettingsPage: React.FC = () => {
 
   const handleSendTestEmail = async () => {
     try {
-      const result = await userService.sendTestEmail();
-      alert(result.message);
-    } catch (error: any) {
+      await userService.sendTestEmail();
+      alert("Test email sent successfully!");
+    } catch (error) {
       console.error("Failed to send test email:", error);
-      alert(error.response?.data?.detail || "Не удалось отправить тестовый email");
+      alert("Failed to send test email");
+    }
+  };
+
+  // ========== EMAIL CHANGE HANDLERS ==========
+  const handleRequestEmailChange = async () => {
+    if (!newEmail || newEmail === user?.email) {
+      setEmailChangeMessage('Enter a new email address');
+      return;
+    }
+
+    setEmailChangeLoading(true);
+    setEmailChangeMessage('');
+    try {
+      await userService.requestEmailChange(newEmail);
+      setEmailChangeMessage('Verification code sent to your new email');
+      setEmailChangeMode('verify-code');
+    } catch (error: any) {
+      setEmailChangeMessage(error?.response?.data?.detail || 'Failed to send verification code');
+    } finally {
+      setEmailChangeLoading(false);
+    }
+  };
+
+  const handleConfirmEmailChange = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      setEmailChangeMessage('Enter a valid 6-digit code');
+      return;
+    }
+
+    setEmailChangeLoading(true);
+    setEmailChangeMessage('');
+    try {
+      await userService.confirmEmailChange(newEmail, verificationCode);
+      setEmailChangeMessage('Email changed successfully!');
+      setEmailChangeMode('idle');
+      setNewEmail('');
+      setVerificationCode('');
+      // Refresh user data
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error: any) {
+      setEmailChangeMessage(error?.response?.data?.detail || 'Failed to confirm email change');
+    } finally {
+      setEmailChangeLoading(false);
+    }
+  };
+
+  // ========== TELEGRAM LINKING HANDLERS ==========
+  const handleLinkTelegram = async () => {
+    if (!telegramCodeInput || telegramCodeInput.length < 6) {
+      setTelegramMessage('Enter a valid code');
+      return;
+    }
+
+    setTelegramLoading(true);
+    setTelegramMessage('');
+    try {
+      const result = await userService.linkTelegramAccount(telegramCodeInput);
+      setTelegramMessage(`✅ Telegram linked! (@${result.telegram_username})`);
+      setTelegramCodeInput('');
+      // Refresh notification settings
+      const settings = await userService.getNotificationSettings();
+      setNotificationSettings(settings);
+    } catch (error: any) {
+      setTelegramMessage(error?.response?.data?.detail || 'Failed to link Telegram');
+    } finally {
+      setTelegramLoading(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    if (!confirm('Are you sure you want to unlink Telegram?')) return;
+
+    setTelegramLoading(true);
+    try {
+      await userService.unlinkTelegramAccount();
+      setTelegramMessage('✅ Telegram unlinked');
+      // Refresh notification settings
+      const settings = await userService.getNotificationSettings();
+      setNotificationSettings(settings);
+    } catch (error: any) {
+      setTelegramMessage(error?.response?.data?.detail || 'Failed to unlink Telegram');
+    } finally {
+      setTelegramLoading(false);
     }
   };
 
@@ -354,6 +450,109 @@ const SettingsPage: React.FC = () => {
                       Failed to load notification settings
                     </div>
                   )}
+                </div>
+
+                {/* Email Change Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="font-semibold text-[22px] text-gray-900 mb-4">
+                    Email change
+                  </h3>
+                  <p className="text-[16px] text-gray-700 mb-6">
+                    Change your email address. You will need to verify the new email.
+                  </p>
+                  {emailChangeMode === 'idle' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">📧</span>
+                        <input
+                          type="email"
+                          placeholder="Enter new email address"
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <button
+                        onClick={handleRequestEmailChange}
+                        disabled={emailChangeLoading}
+                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {emailChangeLoading ? 'Sending...' : 'Request verification code'}
+                      </button>
+                      {emailChangeMessage && (
+                        <p className={`text-[14px] ${emailChangeMessage.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                          {emailChangeMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {emailChangeMode === 'verify-code' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🔑</span>
+                        <input
+                          type="text"
+                          placeholder="Enter verification code"
+                          value={verificationCode}
+                          onChange={(e) => setVerificationCode(e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <button
+                        onClick={handleConfirmEmailChange}
+                        disabled={emailChangeLoading}
+                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {emailChangeLoading ? 'Confirming...' : 'Confirm email change'}
+                      </button>
+                      {emailChangeMessage && (
+                        <p className={`text-[14px] ${emailChangeMessage.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                          {emailChangeMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Telegram Linking Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="font-semibold text-[22px] text-gray-900 mb-4">
+                    Telegram linking
+                  </h3>
+                  <p className="text-[16px] text-gray-700 mb-6">
+                    Link your Telegram account to receive notifications directly.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">💬</span>
+                      <input
+                        type="text"
+                        placeholder="Enter your Telegram code"
+                        value={telegramCodeInput}
+                        onChange={(e) => setTelegramCodeInput(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                    <button
+                      onClick={handleLinkTelegram}
+                      disabled={telegramLoading}
+                      className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {telegramLoading ? 'Linking...' : 'Link Telegram'}
+                    </button>
+                    {telegramMessage && (
+                      <p className={`text-[14px] ${telegramMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                        {telegramMessage}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleUnlinkTelegram}
+                      disabled={!notificationSettings?.has_telegram}
+                      className="mt-2 text-[14px] text-red-600 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Unlink Telegram
+                    </button>
+                  </div>
                 </div>
 
                 {/* Search Settings */}

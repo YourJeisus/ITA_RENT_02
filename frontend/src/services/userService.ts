@@ -35,6 +35,34 @@ class UserService {
     const response = await apiClient.post('/users/notifications/test-email');
     return response.data;
   }
+
+  // ========== EMAIL CHANGE ==========
+  async requestEmailChange(newEmail: string): Promise<{ status: string; message: string; new_email: string }> {
+    const response = await apiClient.post('/users/email/change-request', null, {
+      params: { new_email: newEmail }
+    });
+    return response.data;
+  }
+
+  async confirmEmailChange(newEmail: string, code: string): Promise<{ status: string; message: string; new_email: string }> {
+    const response = await apiClient.post('/users/email/change-confirm', null, {
+      params: { new_email: newEmail, code: code }
+    });
+    return response.data;
+  }
+
+  // ========== TELEGRAM LINKING ==========
+  async linkTelegramAccount(code: string): Promise<{ status: string; message: string; telegram_username: string }> {
+    const response = await apiClient.post('/users/telegram/link', null, {
+      params: { code: code }
+    });
+    return response.data;
+  }
+
+  async unlinkTelegramAccount(): Promise<{ status: string; message: string }> {
+    const response = await apiClient.post('/users/telegram/unlink');
+    return response.data;
+  }
 }
 
 const userService = new UserService();
