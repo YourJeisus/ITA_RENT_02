@@ -16,6 +16,9 @@ interface FilterUpdateData {
   pets_allowed?: boolean | null;
   notification_enabled?: boolean;
   notification_frequency_hours?: number;
+  notify_telegram?: boolean;
+  notify_email?: boolean;
+  notify_whatsapp?: boolean;
 }
 
 interface FilterCreateData {
@@ -32,6 +35,9 @@ interface FilterCreateData {
   pets_allowed?: boolean | null;
   notification_enabled?: boolean;
   notification_frequency_hours?: number;
+  notify_telegram?: boolean;
+  notify_email?: boolean;
+  notify_whatsapp?: boolean;
 }
 
 class FiltersService {

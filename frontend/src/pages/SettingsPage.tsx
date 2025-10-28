@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useFilterStore, PropertyType, RoomType } from "../store/filterStore";
+import { userService } from "../services/userService";
+import { NotificationSettings } from "../types";
 import AuthHeader from "../components/auth/AuthHeader";
 import AuthFooter from "../components/auth/AuthFooter";
 import filtersIcon from "../designSvg/filters-icon.svg";
@@ -19,8 +21,8 @@ const SettingsPage: React.FC = () => {
   const { currentFilter, setCurrentFilter, saveFilter, clearCurrentFilter } = useFilterStore();
 
   const [filterName, setFilterName] = useState("");
-  const [notificationsActive, setNotificationsActive] = useState(true);
-  const [whatsappConnected, setWhatsappConnected] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Section expansion states
   const [myFiltersExpanded, setMyFiltersExpanded] = useState(true);
@@ -76,6 +78,68 @@ const SettingsPage: React.FC = () => {
       ? current.filter((r) => r !== room)
       : [...current, room];
     setCurrentFilter({ ...currentFilter, rooms: updated });
+  };
+
+  // Загрузка настроек уведомлений при монтировании
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      try {
+        const settings = await userService.getNotificationSettings();
+        setNotificationSettings(settings);
+      } catch (error) {
+        console.error("Failed to load notification settings:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotificationSettings();
+  }, []);
+
+  const handleToggleTelegramNotifications = async () => {
+    if (!notificationSettings) return;
+
+    const newValue = !notificationSettings.telegram_notifications_enabled;
+    try {
+      await userService.updateNotificationSettings({
+        telegram_notifications_enabled: newValue,
+      });
+      setNotificationSettings({
+        ...notificationSettings,
+        telegram_notifications_enabled: newValue,
+      });
+    } catch (error) {
+      console.error("Failed to update Telegram notifications:", error);
+      alert("Не удалось обновить настройки Telegram");
+    }
+  };
+
+  const handleToggleEmailNotifications = async () => {
+    if (!notificationSettings) return;
+
+    const newValue = !notificationSettings.email_notifications_enabled;
+    try {
+      await userService.updateNotificationSettings({
+        email_notifications_enabled: newValue,
+      });
+      setNotificationSettings({
+        ...notificationSettings,
+        email_notifications_enabled: newValue,
+      });
+    } catch (error) {
+      console.error("Failed to update Email notifications:", error);
+      alert("Не удалось обновить настройки Email");
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    try {
+      const result = await userService.sendTestEmail();
+      alert(result.message);
+    } catch (error: any) {
+      console.error("Failed to send test email:", error);
+      alert(error.response?.data?.detail || "Не удалось отправить тестовый email");
+    }
   };
 
   const getUserInitial = () => {
@@ -161,63 +225,133 @@ const SettingsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Notification Status */}
+                {/* Notification Channels */}
                 <div className="mb-6">
                   <h3 className="font-semibold text-[22px] text-gray-900 mb-4">
-                    Notification status
+                    Notification channels
                   </h3>
-                  <p className="text-[16px] text-gray-700 mb-4">
-                    Notifications will be sent to WhatsApp.
+                  <p className="text-[16px] text-gray-700 mb-6">
+                    Choose how you want to receive notifications about new listings
                   </p>
 
-                  <div className="flex items-center gap-3 mb-4">
-                    <button
-                      onClick={() =>
-                        setNotificationsActive(!notificationsActive)
-                      }
-                      className={`w-12 h-6 rounded-full transition ${
-                        notificationsActive ? "bg-blue-600" : "bg-gray-300"
-                      }`}
-                    >
-                      <div
-                        className={`w-5 h-5 bg-white rounded-full transform transition ${
-                          notificationsActive
-                            ? "translate-x-6"
-                            : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                    <span className="text-[16px] text-gray-900">
-                      Notifications are{" "}
-                      {notificationsActive ? "active" : "inactive"}
-                    </span>
-                  </div>
+                  {loading ? (
+                    <div className="text-center py-4 text-gray-500">
+                      Loading settings...
+                    </div>
+                  ) : notificationSettings ? (
+                    <div className="space-y-4">
+                      {/* Telegram Notifications */}
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">📱</span>
+                            <div>
+                              <h4 className="font-semibold text-[18px] text-gray-900">
+                                Telegram
+                              </h4>
+                              <p className="text-[14px] text-gray-600">
+                                {notificationSettings.has_telegram
+                                  ? `Connected as ${user?.telegram_username || 'user'}`
+                                  : "Not connected"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleToggleTelegramNotifications}
+                            disabled={!notificationSettings.has_telegram}
+                            className={`w-12 h-6 rounded-full transition ${
+                              notificationSettings.telegram_notifications_enabled &&
+                              notificationSettings.has_telegram
+                                ? "bg-blue-600"
+                                : "bg-gray-300"
+                            } ${!notificationSettings.has_telegram ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            <div
+                              className={`w-5 h-5 bg-white rounded-full transform transition ${
+                                notificationSettings.telegram_notifications_enabled &&
+                                notificationSettings.has_telegram
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        {!notificationSettings.has_telegram && (
+                          <p className="text-[14px] text-amber-600 mt-2">
+                            Connect Telegram bot to enable notifications
+                          </p>
+                        )}
+                      </div>
 
-                  {/* WhatsApp Connection Warning */}
-                  {!whatsappConnected && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={warningIcon}
-                          alt="Warning"
-                          className="w-6 h-6"
-                        />
-                        <p className="font-medium text-[18px] text-amber-500">
-                          To receive notifications, connect your WhatsApp
-                          account.
+                      {/* Email Notifications */}
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">📧</span>
+                            <div>
+                              <h4 className="font-semibold text-[18px] text-gray-900">
+                                Email
+                              </h4>
+                              <p className="text-[14px] text-gray-600">
+                                {user?.email || "No email"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleToggleEmailNotifications}
+                            className={`w-12 h-6 rounded-full transition ${
+                              notificationSettings.email_notifications_enabled
+                                ? "bg-blue-600"
+                                : "bg-gray-300"
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 bg-white rounded-full transform transition ${
+                                notificationSettings.email_notifications_enabled
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        {notificationSettings.email_notifications_enabled && (
+                          <button
+                            onClick={handleSendTestEmail}
+                            className="mt-2 text-[14px] text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Send test email
+                          </button>
+                        )}
+                      </div>
+
+                      {/* WhatsApp Notifications */}
+                      <div className="border border-gray-200 rounded-lg p-4 opacity-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <img src={whatsappIcon} alt="WhatsApp" className="w-6 h-6" />
+                            <div>
+                              <h4 className="font-semibold text-[18px] text-gray-900">
+                                WhatsApp
+                              </h4>
+                              <p className="text-[14px] text-gray-600">
+                                {notificationSettings.has_whatsapp
+                                  ? "Connected"
+                                  : "Not connected"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-[14px] text-gray-500 font-medium">
+                            Coming soon
+                          </div>
+                        </div>
+                        <p className="text-[14px] text-gray-500 mt-2">
+                          WhatsApp notifications will be available in the next update
                         </p>
                       </div>
-                      <button
-                        onClick={() => setWhatsappConnected(true)}
-                        className="flex items-center gap-2 text-amber-500 hover:text-amber-600 transition"
-                      >
-                        <img
-                          src={whatsappIcon}
-                          alt="WhatsApp"
-                          className="w-6 h-6"
-                        />
-                        <span className="font-medium text-[18px]">Connect</span>
-                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-red-500">
+                      Failed to load notification settings
                     </div>
                   )}
                 </div>

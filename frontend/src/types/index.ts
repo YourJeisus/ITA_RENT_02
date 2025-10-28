@@ -83,7 +83,13 @@ export interface User {
   is_active: boolean;
   is_superuser: boolean;
   telegram_chat_id?: string;
-  whatsapp_number?: string;
+  telegram_username?: string;
+  whatsapp_phone?: string;
+  whatsapp_enabled: boolean;
+  email_notifications_enabled: boolean;
+  telegram_notifications_enabled: boolean;
+  email_verified_at?: string;
+  email_last_sent_at?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -96,17 +102,31 @@ export interface Filter {
   created_at: string;
   updated_at?: string;
 
-  // New, specific fields (optional)
+  // Search parameters
   city?: string | null;
   min_price?: number | null;
   max_price?: number | null;
   min_rooms?: number | null;
   max_rooms?: number | null;
   property_type?: string | null;
+  min_area?: number | null;
+  max_area?: number | null;
+  furnished?: boolean | null;
+  pets_allowed?: boolean | null;
+
+  // Notification settings
+  notification_enabled: boolean;
+  notification_frequency_hours: number;
+  last_notification_sent?: string | null;
+
+  // Notification channels
+  notify_telegram: boolean;
+  notify_email: boolean;
+  notify_whatsapp: boolean;
 
   // Deprecated field for backwards compatibility
   filter_params?: Record<string, any>;
-  site_to_monitor?: string; // It was missing but seems important
+  site_to_monitor?: string;
 }
 
 export interface Subscription {
@@ -116,4 +136,14 @@ export interface Subscription {
   start_date: string;
   end_date?: string;
   is_active: boolean;
+}
+
+export interface NotificationSettings {
+  email_notifications_enabled: boolean;
+  telegram_notifications_enabled: boolean;
+  has_telegram: boolean;
+  has_whatsapp: boolean;
+  whatsapp_enabled: boolean;
+  email_verified_at?: string | null;
+  email_last_sent_at?: string | null;
 }
