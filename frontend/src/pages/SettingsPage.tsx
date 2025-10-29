@@ -690,294 +690,65 @@ const SettingsPage: React.FC = () => {
                         </h3>
                         <div className="space-y-2 text-[14px] text-gray-700">
                           <p>
-                            <span className="font-semibold">📍 City:</span> {currentFilter.city || "Rome"}
+                            <span className="font-semibold">📍 City:</span>{" "}
+                            {currentFilter.city || "Rome"}
                           </p>
                           {(currentFilter.property_type || []).length > 0 && (
                             <p>
-                              <span className="font-semibold">🏠 Property Type:</span> {currentFilter.property_type?.join(", ")}
+                              <span className="font-semibold">
+                                🏠 Property Type:
+                              </span>{" "}
+                              {currentFilter.property_type?.join(", ")}
                             </p>
                           )}
                           {(currentFilter.rooms || []).length > 0 && (
                             <p>
-                              <span className="font-semibold">🚪 Rooms:</span> {currentFilter.rooms?.join(", ")}
+                              <span className="font-semibold">🚪 Rooms:</span>{" "}
+                              {currentFilter.rooms?.join(", ")}
                             </p>
                           )}
-                          {(currentFilter.price_min || currentFilter.price_max) && (
+                          {(currentFilter.price_min ||
+                            currentFilter.price_max) && (
                             <p>
-                              <span className="font-semibold">💰 Price:</span> €{currentFilter.price_min || "any"} - €{currentFilter.price_max || "any"}
+                              <span className="font-semibold">💰 Price:</span> €
+                              {currentFilter.price_min || "any"} - €
+                              {currentFilter.price_max || "any"}
                             </p>
                           )}
-                          {(currentFilter.min_area || currentFilter.max_area) && (
+                          {(currentFilter.min_area ||
+                            currentFilter.max_area) && (
                             <p>
-                              <span className="font-semibold">📐 Area:</span> {currentFilter.min_area || "any"}m² - {currentFilter.max_area || "any"}m²
+                              <span className="font-semibold">📐 Area:</span>{" "}
+                              {currentFilter.min_area || "any"}m² -{" "}
+                              {currentFilter.max_area || "any"}m²
                             </p>
                           )}
                           {currentFilter.no_commission && (
                             <p>
-                              <span className="font-semibold">✓ No commission</span>
+                              <span className="font-semibold">
+                                ✓ No commission
+                              </span>
                             </p>
                           )}
                           {currentFilter.pets_allowed && (
                             <p>
-                              <span className="font-semibold">✓ Pets allowed</span>
+                              <span className="font-semibold">
+                                ✓ Pets allowed
+                              </span>
                             </p>
                           )}
                           {currentFilter.children_allowed && (
                             <p>
-                              <span className="font-semibold">✓ Children allowed</span>
+                              <span className="font-semibold">
+                                ✓ Children allowed
+                              </span>
                             </p>
                           )}
                         </div>
                         <p className="text-[12px] text-gray-600 mt-3 italic">
-                          📧 You will receive email notifications when new apartments matching these criteria are posted
+                          📧 You will receive email notifications when new
+                          apartments matching these criteria are posted
                         </p>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="border-t border-gray-200 my-6 pt-6">
-                        <h3 className="font-semibold text-[18px] text-gray-900 mb-4">
-                          Modify Your Subscription
-                        </h3>
-                      </div>
-
-                      {/* Search Settings */}
-                      <div className="grid grid-cols-1 gap-6">
-                        {/* City */}
-                        <div>
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-2">
-                            City
-                          </label>
-                          <select
-                            value={currentFilter.city || "Rome"}
-                            onChange={(e) =>
-                              setCurrentFilter({
-                                ...currentFilter,
-                                city: e.target.value,
-                              })
-                            }
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 appearance-none bg-white focus:outline-none focus:border-blue-600"
-                            style={{
-                              backgroundImage: `url(${arrowDownIcon})`,
-                              backgroundPosition: "right 12px center",
-                              backgroundRepeat: "no-repeat",
-                              backgroundSize: "16px",
-                            }}
-                          >
-                            <option value="Rome">Rome</option>
-                            <option value="Milan">Milan</option>
-                            <option value="Florence">Florence</option>
-                            <option value="Naples">Naples</option>
-                            <option value="Turin">Turin</option>
-                            <option value="Venice">Venice</option>
-                            <option value="Bologna">Bologna</option>
-                          </select>
-                        </div>
-
-                        {/* Property Type */}
-                        <div>
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-2">
-                            Property type
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {(
-                              ["apartment", "room", "house"] as PropertyType[]
-                            ).map((type) => (
-                              <button
-                                key={type}
-                                onClick={() => handlePropertyTypeToggle(type)}
-                                className={`px-4 py-2 rounded-lg text-[14px] font-medium transition ${
-                                  (currentFilter.property_type || []).includes(
-                                    type
-                                  )
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                }`}
-                              >
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Rooms */}
-                        <div>
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-2">
-                            Rooms
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {(
-                              ["studio", "1", "2", "3", "4", "5+"] as RoomType[]
-                            ).map((room) => (
-                              <button
-                                key={room}
-                                onClick={() => handleRoomToggle(room)}
-                                className={`px-4 py-2 rounded-lg text-[14px] font-medium transition min-w-[60px] ${
-                                  (currentFilter.rooms || []).includes(room)
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                }`}
-                              >
-                                {room === "studio" ? "Studio" : room}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Price */}
-                        <div>
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-2">
-                            Price, €
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              placeholder="From"
-                              value={currentFilter.price_min || ""}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  price_min: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                            <span className="text-gray-400">—</span>
-                            <input
-                              type="number"
-                              placeholder="To"
-                              value={currentFilter.price_max || ""}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  price_max: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Area */}
-                        <div>
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-2">
-                            Area, m²
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              placeholder="From"
-                              value={currentFilter.min_area || ""}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  min_area: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                            <span className="text-gray-400">—</span>
-                            <input
-                              type="number"
-                              placeholder="To"
-                              value={currentFilter.max_area || ""}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  max_area: e.target.value,
-                                })
-                              }
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Additional Options */}
-                        <div className="space-y-3">
-                          <label className="font-semibold text-[18px] text-gray-700 block mb-3">
-                            Additional preferences
-                          </label>
-
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={currentFilter.no_commission || false}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  no_commission: e.target.checked,
-                                })
-                              }
-                              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-[16px] text-gray-700">
-                              No commission
-                            </span>
-                          </label>
-
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={currentFilter.pets_allowed || false}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  pets_allowed: e.target.checked,
-                                })
-                              }
-                              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-[16px] text-gray-700">
-                              Pets allowed
-                            </span>
-                          </label>
-
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={currentFilter.children_allowed || false}
-                              onChange={(e) =>
-                                setCurrentFilter({
-                                  ...currentFilter,
-                                  children_allowed: e.target.checked,
-                                })
-                              }
-                              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-[16px] text-gray-700">
-                              Children allowed
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Name Your Filter */}
-                      <div className="mt-8 border-t border-gray-200 pt-6">
-                        <h3 className="font-semibold text-[22px] text-gray-900 mb-4">
-                          Name your filter
-                        </h3>
-                        <input
-                          type="text"
-                          placeholder="Enter filter name"
-                          value={filterName}
-                          onChange={(e) => setFilterName(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 mb-4 bg-white"
-                        />
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-4">
-                          <button
-                            onClick={handleSaveFilter}
-                            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition"
-                          >
-                            Save filter
-                          </button>
-                          <button
-                            onClick={handleResetFilter}
-                            className="px-6 py-2.5 border border-gray-200 text-gray-900 rounded-lg font-semibold text-[16px] hover:bg-gray-50 transition"
-                          >
-                            Reset
-                          </button>
-                        </div>
                       </div>
                     </div>
                   )}
