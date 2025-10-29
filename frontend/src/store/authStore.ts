@@ -9,6 +9,7 @@ interface AuthState {
   login: (token: string, user: User) => void;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  setUser: (user: User) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -24,6 +25,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     authService.logout();
     set({ user: null, isAuthenticated: false });
+  },
+
+  setUser: (user: User) => {
+    set({ user });
   },
 
   checkAuth: async () => {

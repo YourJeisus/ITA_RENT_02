@@ -203,4 +203,18 @@ def test_token(
     """
     Тестирование JWT токена
     """
-    return current_user 
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        notification_email=current_user.notification_email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        subscription_type=current_user.subscription_type,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+        telegram_chat_id=current_user.telegram_chat_id,
+        telegram_username=current_user.telegram_username,
+        email_notifications_enabled=current_user.email_notifications_enabled,
+        telegram_notifications_enabled=current_user.telegram_notifications_enabled
+    ) 

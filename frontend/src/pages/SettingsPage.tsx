@@ -15,13 +15,37 @@ import warningIcon from "../designSvg/warning.svg";
 import whatsappIcon from "../designSvg/whatsapp.svg";
 import arrowDownIcon from "../designSvg/arrow-down.svg";
 
+// Стили для исправления чёрного фона input полей
+const inputStyles = `
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    box-shadow: 0 0 0 30px white inset !important;
+  }
+  
+  input:-webkit-autofill {
+    -webkit-text-fill-color: #1f2937 !important;
+  }
+`;
+
+// Добавляем стили в head
+if (typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.textContent = inputStyles;
+  document.head.appendChild(style);
+}
+
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, user } = useAuthStore();
-  const { currentFilter, setCurrentFilter, saveFilter, clearCurrentFilter } = useFilterStore();
+  const { currentFilter, setCurrentFilter, saveFilter, clearCurrentFilter } =
+    useFilterStore();
 
   const [filterName, setFilterName] = useState("");
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
+  const [notificationSettings, setNotificationSettings] =
+    useState<NotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Section expansion states
@@ -31,17 +55,19 @@ const SettingsPage: React.FC = () => {
   const [paymentExpanded, setPaymentExpanded] = useState(false);
 
   // Email change states
-  const [emailChangeMode, setEmailChangeMode] = useState<'idle' | 'enter-email' | 'verify-code'>('idle');
-  const [newEmail, setNewEmail] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
+  const [emailChangeMode, setEmailChangeMode] = useState<
+    "idle" | "enter-email" | "verify-code"
+  >("idle");
+  const [newEmail, setNewEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [emailChangeLoading, setEmailChangeLoading] = useState(false);
-  const [emailChangeMessage, setEmailChangeMessage] = useState('');
+  const [emailChangeMessage, setEmailChangeMessage] = useState("");
 
   // Telegram linking states
-  const [telegramCode, setTelegramCode] = useState('');
-  const [telegramCodeInput, setTelegramCodeInput] = useState('');
+  const [telegramCode, setTelegramCode] = useState("");
+  const [telegramCodeInput, setTelegramCodeInput] = useState("");
   const [telegramLoading, setTelegramLoading] = useState(false);
-  const [telegramMessage, setTelegramMessage] = useState('');
+  const [telegramMessage, setTelegramMessage] = useState("");
 
   const handleLogout = () => {
     logout();
@@ -53,7 +79,7 @@ const SettingsPage: React.FC = () => {
       alert("Please enter a filter name");
       return;
     }
-    
+
     saveFilter({
       name: filterName,
       city: currentFilter.city || "Rome",
@@ -67,7 +93,7 @@ const SettingsPage: React.FC = () => {
       pets_allowed: currentFilter.pets_allowed || false,
       children_allowed: currentFilter.children_allowed || false,
     });
-    
+
     alert(`Filter "${filterName}" saved successfully!`);
     setFilterName("");
   };
@@ -157,19 +183,21 @@ const SettingsPage: React.FC = () => {
 
   // ========== EMAIL CHANGE HANDLERS ==========
   const handleRequestEmailChange = async () => {
-    if (!newEmail || newEmail === user?.email) {
-      setEmailChangeMessage('Enter a new email address');
+    if (!newEmail || newEmail === user?.notification_email) {
+      setEmailChangeMessage("This is already your notification email");
       return;
     }
 
     setEmailChangeLoading(true);
-    setEmailChangeMessage('');
+    setEmailChangeMessage("");
     try {
       await userService.requestEmailChange(newEmail);
-      setEmailChangeMessage('Verification code sent to your new email');
-      setEmailChangeMode('verify-code');
+      setEmailChangeMessage("Verification code sent to your new email");
+      setEmailChangeMode("verify-code");
     } catch (error: any) {
-      setEmailChangeMessage(error?.response?.data?.detail || 'Failed to send verification code');
+      setEmailChangeMessage(
+        error?.response?.data?.detail || "Failed to send verification code"
+      );
     } finally {
       setEmailChangeLoading(false);
     }
@@ -177,22 +205,49 @@ const SettingsPage: React.FC = () => {
 
   const handleConfirmEmailChange = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
-      setEmailChangeMessage('Enter a valid 6-digit code');
+      setEmailChangeMessage("Enter a valid 6-digit code");
       return;
     }
 
     setEmailChangeLoading(true);
-    setEmailChangeMessage('');
+    setEmailChangeMessage("");
     try {
-      await userService.confirmEmailChange(newEmail, verificationCode);
-      setEmailChangeMessage('Email changed successfully!');
-      setEmailChangeMode('idle');
-      setNewEmail('');
-      setVerificationCode('');
-      // Refresh user data
-      setTimeout(() => window.location.reload(), 1000);
+      const result = await userService.confirmEmailChange(
+        newEmail,
+        verificationCode
+      );
+
+      if (result.status === "success") {
+        setEmailChangeMessage("✅ " + result.message);
+        setVerificationCode("");
+        setNewEmail("");
+        setEmailChangeMode("idle");
+
+        // Refresh user profile to get updated notification_email
+        try {
+          const updatedUser = await userService.getProfile();
+          // Update auth store with new user data
+          const { setUser } = useAuthStore.getState();
+          setUser(updatedUser);
+          console.log(
+            "📧 User profile updated:",
+            updatedUser.notification_email
+          );
+
+          // Reload page after 1 second to ensure everything is in sync
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } catch (refreshError) {
+          console.warn("Could not refresh user profile:", refreshError);
+        }
+      } else {
+        setEmailChangeMessage("❌ " + result.message);
+      }
     } catch (error: any) {
-      setEmailChangeMessage(error?.response?.data?.detail || 'Failed to confirm email change');
+      setEmailChangeMessage(
+        error?.response?.data?.detail || "Failed to confirm email change"
+      );
     } finally {
       setEmailChangeLoading(false);
     }
@@ -201,38 +256,42 @@ const SettingsPage: React.FC = () => {
   // ========== TELEGRAM LINKING HANDLERS ==========
   const handleLinkTelegram = async () => {
     if (!telegramCodeInput || telegramCodeInput.length < 6) {
-      setTelegramMessage('Enter a valid code');
+      setTelegramMessage("Enter a valid code");
       return;
     }
 
     setTelegramLoading(true);
-    setTelegramMessage('');
+    setTelegramMessage("");
     try {
       const result = await userService.linkTelegramAccount(telegramCodeInput);
       setTelegramMessage(`✅ Telegram linked! (@${result.telegram_username})`);
-      setTelegramCodeInput('');
+      setTelegramCodeInput("");
       // Refresh notification settings
       const settings = await userService.getNotificationSettings();
       setNotificationSettings(settings);
     } catch (error: any) {
-      setTelegramMessage(error?.response?.data?.detail || 'Failed to link Telegram');
+      setTelegramMessage(
+        error?.response?.data?.detail || "Failed to link Telegram"
+      );
     } finally {
       setTelegramLoading(false);
     }
   };
 
   const handleUnlinkTelegram = async () => {
-    if (!confirm('Are you sure you want to unlink Telegram?')) return;
+    if (!confirm("Are you sure you want to unlink Telegram?")) return;
 
     setTelegramLoading(true);
     try {
       await userService.unlinkTelegramAccount();
-      setTelegramMessage('✅ Telegram unlinked');
+      setTelegramMessage("✅ Telegram unlinked");
       // Refresh notification settings
       const settings = await userService.getNotificationSettings();
       setNotificationSettings(settings);
     } catch (error: any) {
-      setTelegramMessage(error?.response?.data?.detail || 'Failed to unlink Telegram');
+      setTelegramMessage(
+        error?.response?.data?.detail || "Failed to unlink Telegram"
+      );
     } finally {
       setTelegramLoading(false);
     }
@@ -295,7 +354,9 @@ const SettingsPage: React.FC = () => {
                               {filter.name}
                             </h4>
                             <p className="text-[14px] text-gray-600">
-                              {filter.city} • {filter.property_type.join(', ') || 'Any'} • {filter.rooms.join(', ') || 'Any'}
+                              {filter.city} •{" "}
+                              {filter.property_type.join(", ") || "Any"} •{" "}
+                              {filter.rooms.join(", ") || "Any"}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -309,7 +370,11 @@ const SettingsPage: React.FC = () => {
                               Load
                             </button>
                             <button
-                              onClick={() => useFilterStore.getState().deleteFilter(filter.id)}
+                              onClick={() =>
+                                useFilterStore
+                                  .getState()
+                                  .deleteFilter(filter.id)
+                              }
                               className="px-4 py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
                             >
                               Delete
@@ -327,7 +392,8 @@ const SettingsPage: React.FC = () => {
                     Notification channels
                   </h3>
                   <p className="text-[16px] text-gray-700 mb-6">
-                    Choose how you want to receive notifications about new listings
+                    Choose how you want to receive notifications about new
+                    listings
                   </p>
 
                   {loading ? (
@@ -347,7 +413,7 @@ const SettingsPage: React.FC = () => {
                               </h4>
                               <p className="text-[14px] text-gray-600">
                                 {notificationSettings.has_telegram
-                                  ? `Connected as ${user?.telegram_username || 'user'}`
+                                  ? `Connected as ${user?.telegram_username || "user"}`
                                   : "Not connected"}
                               </p>
                             </div>
@@ -389,7 +455,9 @@ const SettingsPage: React.FC = () => {
                                 Email
                               </h4>
                               <p className="text-[14px] text-gray-600">
-                                {user?.email || "No email"}
+                                {user?.notification_email ||
+                                  user?.email ||
+                                  "No email"}
                               </p>
                             </div>
                           </div>
@@ -424,7 +492,11 @@ const SettingsPage: React.FC = () => {
                       <div className="border border-gray-200 rounded-lg p-4 opacity-50">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
-                            <img src={whatsappIcon} alt="WhatsApp" className="w-6 h-6" />
+                            <img
+                              src={whatsappIcon}
+                              alt="WhatsApp"
+                              className="w-6 h-6"
+                            />
                             <div>
                               <h4 className="font-semibold text-[18px] text-gray-900">
                                 WhatsApp
@@ -441,7 +513,8 @@ const SettingsPage: React.FC = () => {
                           </div>
                         </div>
                         <p className="text-[14px] text-gray-500 mt-2">
-                          WhatsApp notifications will be available in the next update
+                          WhatsApp notifications will be available in the next
+                          update
                         </p>
                       </div>
                     </div>
@@ -455,12 +528,26 @@ const SettingsPage: React.FC = () => {
                 {/* Email Change Section */}
                 <div className="border-t border-gray-200 pt-6">
                   <h3 className="font-semibold text-[22px] text-gray-900 mb-4">
-                    Email change
+                    Notification email
                   </h3>
                   <p className="text-[16px] text-gray-700 mb-6">
-                    Change your email address. You will need to verify the new email.
+                    Change the email where you receive notifications. Your login
+                    email remains the same.
                   </p>
-                  {emailChangeMode === 'idle' && (
+
+                  {/* Current Email Display */}
+                  {user?.notification_email && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-[14px] text-gray-600">
+                        Current notification email:
+                      </p>
+                      <p className="text-[16px] font-medium text-blue-600">
+                        {user.notification_email}
+                      </p>
+                    </div>
+                  )}
+
+                  {emailChangeMode === "idle" && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">📧</span>
@@ -469,7 +556,8 @@ const SettingsPage: React.FC = () => {
                           placeholder="Enter new email address"
                           value={newEmail}
                           onChange={(e) => setNewEmail(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          autoComplete="off"
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                       </div>
                       <button
@@ -477,16 +565,20 @@ const SettingsPage: React.FC = () => {
                         disabled={emailChangeLoading}
                         className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {emailChangeLoading ? 'Sending...' : 'Request verification code'}
+                        {emailChangeLoading
+                          ? "Sending..."
+                          : "Request verification code"}
                       </button>
                       {emailChangeMessage && (
-                        <p className={`text-[14px] ${emailChangeMessage.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                        <p
+                          className={`text-[14px] ${emailChangeMessage.includes("Success") ? "text-green-600" : "text-red-600"}`}
+                        >
                           {emailChangeMessage}
                         </p>
                       )}
                     </div>
                   )}
-                  {emailChangeMode === 'verify-code' && (
+                  {emailChangeMode === "verify-code" && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">🔑</span>
@@ -495,7 +587,8 @@ const SettingsPage: React.FC = () => {
                           placeholder="Enter verification code"
                           value={verificationCode}
                           onChange={(e) => setVerificationCode(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          autoComplete="off"
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                       </div>
                       <button
@@ -503,10 +596,14 @@ const SettingsPage: React.FC = () => {
                         disabled={emailChangeLoading}
                         className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {emailChangeLoading ? 'Confirming...' : 'Confirm email change'}
+                        {emailChangeLoading
+                          ? "Confirming..."
+                          : "Confirm email change"}
                       </button>
                       {emailChangeMessage && (
-                        <p className={`text-[14px] ${emailChangeMessage.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                        <p
+                          className={`text-[14px] ${emailChangeMessage.includes("Success") ? "text-green-600" : "text-red-600"}`}
+                        >
                           {emailChangeMessage}
                         </p>
                       )}
@@ -520,7 +617,8 @@ const SettingsPage: React.FC = () => {
                     Telegram linking
                   </h3>
                   <p className="text-[16px] text-gray-700 mb-6">
-                    Link your Telegram account to receive notifications directly.
+                    Link your Telegram account to receive notifications
+                    directly.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -530,7 +628,8 @@ const SettingsPage: React.FC = () => {
                         placeholder="Enter your Telegram code"
                         value={telegramCodeInput}
                         onChange={(e) => setTelegramCodeInput(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                        autoComplete="off"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                       />
                     </div>
                     <button
@@ -538,10 +637,12 @@ const SettingsPage: React.FC = () => {
                       disabled={telegramLoading}
                       className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-[16px] hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {telegramLoading ? 'Linking...' : 'Link Telegram'}
+                      {telegramLoading ? "Linking..." : "Link Telegram"}
                     </button>
                     {telegramMessage && (
-                      <p className={`text-[14px] ${telegramMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                      <p
+                        className={`text-[14px] ${telegramMessage.includes("✅") ? "text-green-600" : "text-red-600"}`}
+                      >
                         {telegramMessage}
                       </p>
                     )}
@@ -572,7 +673,12 @@ const SettingsPage: React.FC = () => {
                       </label>
                       <select
                         value={currentFilter.city || "Rome"}
-                        onChange={(e) => setCurrentFilter({ ...currentFilter, city: e.target.value })}
+                        onChange={(e) =>
+                          setCurrentFilter({
+                            ...currentFilter,
+                            city: e.target.value,
+                          })
+                        }
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 appearance-none bg-white focus:outline-none focus:border-blue-600"
                         style={{
                           backgroundImage: `url(${arrowDownIcon})`,
@@ -597,19 +703,23 @@ const SettingsPage: React.FC = () => {
                         Property type
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {(['apartment', 'room', 'house'] as PropertyType[]).map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => handlePropertyTypeToggle(type)}
-                            className={`px-4 py-2 rounded-lg text-[14px] font-medium transition ${
-                              (currentFilter.property_type || []).includes(type)
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                          </button>
-                        ))}
+                        {(["apartment", "room", "house"] as PropertyType[]).map(
+                          (type) => (
+                            <button
+                              key={type}
+                              onClick={() => handlePropertyTypeToggle(type)}
+                              className={`px-4 py-2 rounded-lg text-[14px] font-medium transition ${
+                                (currentFilter.property_type || []).includes(
+                                  type
+                                )
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              }`}
+                            >
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </button>
+                          )
+                        )}
                       </div>
                     </div>
 
@@ -619,17 +729,19 @@ const SettingsPage: React.FC = () => {
                         Rooms
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {(['studio', '1', '2', '3', '4', '5+'] as RoomType[]).map((room) => (
+                        {(
+                          ["studio", "1", "2", "3", "4", "5+"] as RoomType[]
+                        ).map((room) => (
                           <button
                             key={room}
                             onClick={() => handleRoomToggle(room)}
                             className={`px-4 py-2 rounded-lg text-[14px] font-medium transition min-w-[60px] ${
                               (currentFilter.rooms || []).includes(room)
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                             }`}
                           >
-                            {room === 'studio' ? 'Studio' : room}
+                            {room === "studio" ? "Studio" : room}
                           </button>
                         ))}
                       </div>
@@ -645,16 +757,26 @@ const SettingsPage: React.FC = () => {
                           type="number"
                           placeholder="From"
                           value={currentFilter.price_min || ""}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, price_min: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              price_min: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                         <span className="text-gray-400">—</span>
                         <input
                           type="number"
                           placeholder="To"
                           value={currentFilter.price_max || ""}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, price_max: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              price_max: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                       </div>
                     </div>
@@ -669,16 +791,26 @@ const SettingsPage: React.FC = () => {
                           type="number"
                           placeholder="From"
                           value={currentFilter.min_area || ""}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, min_area: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              min_area: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                         <span className="text-gray-400">—</span>
                         <input
                           type="number"
                           placeholder="To"
                           value={currentFilter.max_area || ""}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, max_area: e.target.value })}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600"
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              max_area: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 bg-white"
                         />
                       </div>
                     </div>
@@ -688,35 +820,56 @@ const SettingsPage: React.FC = () => {
                       <label className="font-semibold text-[18px] text-gray-700 block mb-3">
                         Additional preferences
                       </label>
-                      
+
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={currentFilter.no_commission || false}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, no_commission: e.target.checked })}
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              no_commission: e.target.checked,
+                            })
+                          }
                           className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        <span className="text-[16px] text-gray-700">No commission</span>
+                        <span className="text-[16px] text-gray-700">
+                          No commission
+                        </span>
                       </label>
 
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={currentFilter.pets_allowed || false}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, pets_allowed: e.target.checked })}
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              pets_allowed: e.target.checked,
+                            })
+                          }
                           className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        <span className="text-[16px] text-gray-700">Pets allowed</span>
+                        <span className="text-[16px] text-gray-700">
+                          Pets allowed
+                        </span>
                       </label>
 
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={currentFilter.children_allowed || false}
-                          onChange={(e) => setCurrentFilter({ ...currentFilter, children_allowed: e.target.checked })}
+                          onChange={(e) =>
+                            setCurrentFilter({
+                              ...currentFilter,
+                              children_allowed: e.target.checked,
+                            })
+                          }
                           className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        <span className="text-[16px] text-gray-700">Children allowed</span>
+                        <span className="text-[16px] text-gray-700">
+                          Children allowed
+                        </span>
                       </label>
                     </div>
                   </div>
@@ -731,7 +884,7 @@ const SettingsPage: React.FC = () => {
                       placeholder="Enter filter name"
                       value={filterName}
                       onChange={(e) => setFilterName(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 mb-4"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-[16px] text-gray-900 focus:outline-none focus:border-blue-600 mb-4 bg-white"
                     />
 
                     {/* Action Buttons */}

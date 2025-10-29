@@ -40,9 +40,46 @@ interface FilterCreateData {
   notify_whatsapp?: boolean;
 }
 
+export interface FilterSubscribePayload {
+  name?: string;
+  city?: string | null;
+  min_price?: number | null;
+  max_price?: number | null;
+  min_rooms?: number | null;
+  max_rooms?: number | null;
+  property_type?: string | null;
+  min_area?: number | null;
+  max_area?: number | null;
+  furnished?: boolean | null;
+  pets_allowed?: boolean | null;
+  notification_enabled?: boolean;
+  notification_frequency_hours?: number;
+  notify_telegram?: boolean;
+  notify_email?: boolean;
+  notify_whatsapp?: boolean;
+  force_replace?: boolean;
+}
+
+export interface FilterSubscribeResponse {
+  status: "created" | "replaced" | "needs_confirmation";
+  message: string;
+  filter?: Filter;
+  existing_filter?: Filter;
+}
+
 class FiltersService {
   async getUserFilters(): Promise<Filter[]> {
     const response = await apiClient.get<Filter[]>("/filters/");
+    return response.data;
+  }
+
+  async subscribeToFilter(
+    data: FilterSubscribePayload
+  ): Promise<FilterSubscribeResponse> {
+    const response = await apiClient.post<FilterSubscribeResponse>(
+      "/filters/subscribe",
+      data
+    );
     return response.data;
   }
 

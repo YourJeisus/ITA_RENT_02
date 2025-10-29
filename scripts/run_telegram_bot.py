@@ -6,6 +6,7 @@ import os
 import sys
 import asyncio
 import logging
+import warnings
 from pathlib import Path
 
 # Добавляем корневую папку в путь
@@ -120,14 +121,57 @@ async def main():
             user = update.effective_user
             chat_id = update.effective_chat.id
             
-            logger.info(f"👤 Новый пользователь Telegram: {user.username} (ID: {user.id})")
+            logger.info(f"👤 Пользователь Telegram: {user.username} (ID: {user.id})")
             
-            # Генерируем код для связки
-            code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            # Проверяем есть ли уже привязка
+            try:
+                db = next(get_db())
+                existing_user = db.query(User).filter(User.telegram_chat_id == str(user.id)).first()
+                db.close()
+                
+                if existing_user:
+                    # Уже привязан
+                    message = f"""
+✅ **Ваш аккаунт уже привязан!**
+
+Email: `{existing_user.email}`
+Telegram: @{existing_user.telegram_username or user.username}
+
+Используйте:
+/status - проверить статус
+/settings - управлять уведомлениями
+/unlink - отвязать аккаунт
+                    """
+                    await update.message.reply_text(message, parse_mode='Markdown')
+                    logger.info(f"ℹ️ Пользователь {user.username} уже привязан")
+                    return
+            except Exception as e:
+                logger.error(f"Ошибка проверки существующей привязки: {e}")
             
-            # Сохраняем код используя сервис
+            # Проверяем если уже есть активный код для этого пользователя
             from src.services.telegram_linking_service import telegram_linking_service
-            telegram_linking_service.store_code(code, user.id, user.username, chat_id)
+            existing_code_data = telegram_linking_service.find_code_by_telegram_id(user.id)
+            
+            if existing_code_data:
+                # Код уже существует и ещё активен
+                logger.info(f"ℹ️ Повторный /start - используем существующий код для {user.username}")
+                code = None
+                # Ищем сам код по данным
+                codes_dict = telegram_linking_service._load_codes()
+                codes_dict = telegram_linking_service._cleanup_expired(codes_dict)
+                for stored_code, data in codes_dict.items():
+                    if data['telegram_id'] == user.id:
+                        code = stored_code
+                        break
+                
+                if not code:
+                    # Если вдруг не нашли, генерируем новый
+                    code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+                    telegram_linking_service.store_code(code, user.id, user.username, chat_id)
+            else:
+                # Генерируем новый код для связки
+                code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+                telegram_linking_service.store_code(code, user.id, user.username, chat_id)
             
             message = f"""
 🏠 Добро пожаловать в ITA Rent Bot!
@@ -172,38 +216,44 @@ async def main():
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """Проверка статуса привязки"""
             try:
-                user_id = update.effective_user.id
+                telegram_user_id = update.effective_user.id
+                telegram_username = update.effective_user.username
+                
+                logger.info(f"📊 Проверка статуса для {telegram_username} (ID: {telegram_user_id})")
+                
                 db = next(get_db())
                 
-                user = db.query(User).filter(User.telegram_chat_id == str(user_id)).first()
+                # Ищем пользователя по telegram_chat_id
+                # telegram_chat_id хранится как string, поэтому сравниваем со str(telegram_user_id)
+                user = db.query(User).filter(User.telegram_chat_id == str(telegram_user_id)).first()
                 
                 if user:
-                    status_text = f"""
-✅ **Аккаунт привязан!**
+                    status_text = f"""✅ *Аккаунт привязан!*
 
-Email: `{user.email}`
-Имя: {user.first_name} {user.last_name or ''}
-Telegram: @{user.telegram_username or 'unknown'}
+📧 Email: {user.email}
+📨 Рассылка на: {user.notification_email or user.email}
+👤 Имя: {user.first_name} {user.last_name or ''}
+💬 Telegram: @{user.telegram_username or 'unknown'}
 
-Уведомления:
+*Уведомления:*
 • Telegram: {'✅ Включены' if user.telegram_notifications_enabled else '❌ Выключены'}
 • Email: {'✅ Включены' if user.email_notifications_enabled else '❌ Выключены'}
 
-Используйте /settings для изменения
-                    """
+Используйте /settings для изменения"""
+                    logger.info(f"✅ Статус найден: {user.email}")
                 else:
-                    status_text = """
-❌ **Аккаунт не привязан**
+                    status_text = """❌ *Аккаунт не привязан*
 
-Используйте /start для получения кода связки
-                    """
+Используйте /start для получения кода связки и привязки аккаунта."""
+                    logger.info(f"ℹ️ Аккаунт {telegram_username} не привязан")
                 
                 db.close()
-                await update.message.reply_text(status_text, parse_mode='Markdown')
+                # Отправляем текст без parse_mode чтобы избежать конфликтов с символами типа @
+                await update.message.reply_text(status_text)
                 
             except Exception as e:
-                logger.error(f"Ошибка при проверке статуса: {e}")
-                await update.message.reply_text("❌ Ошибка при проверке статуса")
+                logger.error(f"❌ Ошибка при проверке статуса: {e}", exc_info=True)
+                await update.message.reply_text("❌ Ошибка при проверке статуса. Пожалуйста, попробуйте позже.")
         
         async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """Управление настройками"""
@@ -273,9 +323,23 @@ https://ita-rent-02.vercel.app/settings
         application.add_handler(CommandHandler("settings", settings_command))
         application.add_handler(CommandHandler("unlink", unlink_command))
         
-        # Запускаем бота
+        # Запускаем бота используя lifecycle methods
         logger.info("🚀 Telegram бот запущен и слушает обновления...")
-        await application.run_polling()
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        
+        # Будем слушать до завершения
+        try:
+            # Этот блок будет блокировать до Ctrl+C или ошибки
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("⏹️ Получен сигнал прерывания")
+        finally:
+            await application.updater.stop()
+            await application.stop()
+            await application.shutdown()
         
     except ImportError:
         logger.error("❌ Telegram библиотека не установлена")
@@ -283,7 +347,27 @@ https://ita-rent-02.vercel.app/settings
         sys.exit(1)
     except Exception as e:
         logger.error(f"❌ Критическая ошибка: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        # Подавляем предупреждения о event loop от python-telegram-bot
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        
+        # Используем event loop напрямую чтобы не закрывать его после завершения
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Запускаем главную корутину но НЕ закрываем loop
+        loop.run_until_complete(main())
+            
+    except KeyboardInterrupt:
+        logger.info("⏹️ Бот остановлен пользователем")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка в главной функции: {e}")
+        sys.exit(1) 

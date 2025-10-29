@@ -2,16 +2,25 @@
 API endpoints для работы с фильтрами пользователей
 """
 from typing import List, Optional
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_db, get_current_user
 from src.crud.crud_filter import filter as crud_filter
-from src.schemas.filter import FilterCreate, FilterUpdate, FilterResponse, Filter
+from src.schemas.filter import (
+    FilterCreate,
+    FilterUpdate,
+    FilterResponse,
+    Filter,
+    FilterSubscribeRequest,
+    FilterSubscribeResponse,
+)
 from src.db.models import User
 from src.services.telegram_bot import send_filter_confirmation_message
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[Filter])
@@ -86,6 +95,103 @@ async def create_filter(
             logger.error(f"Ошибка отправки подтверждения в Telegram: {e}")
     
     return filter_obj
+
+
+@router.post("/subscribe", response_model=FilterSubscribeResponse)
+async def subscribe_filter(
+    subscribe_data: FilterSubscribeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Создать или заменить подписку на фильтр"""
+    existing_filters = crud_filter.get_by_user(db=db, user_id=current_user.id)
+    existing_filter = existing_filters[0] if existing_filters else None
+
+    # Если фильтр уже существует и не запрошено подтверждение
+    if existing_filter and not subscribe_data.force_replace:
+        logger.info(
+            "Пользователь %s запросил подписку, но фильтр уже существует", current_user.id
+        )
+        return FilterSubscribeResponse(
+            status="needs_confirmation",
+            message="Подписка уже настроена. Заменить существующий фильтр?",
+            existing_filter=existing_filter
+        )
+
+    # Подготовка данных фильтра
+    default_name = subscribe_data.name or "My rental filter"
+    if subscribe_data.city:
+        default_name = f"{subscribe_data.city} rentals"
+
+    create_payload = FilterCreate(
+        name=default_name,
+        city=subscribe_data.city,
+        min_price=subscribe_data.min_price,
+        max_price=subscribe_data.max_price,
+        min_rooms=subscribe_data.min_rooms,
+        max_rooms=subscribe_data.max_rooms,
+        property_type=subscribe_data.property_type,
+        min_area=subscribe_data.min_area,
+        max_area=subscribe_data.max_area,
+        furnished=subscribe_data.furnished,
+        pets_allowed=subscribe_data.pets_allowed,
+        notification_enabled=subscribe_data.notification_enabled
+        if subscribe_data.notification_enabled is not None
+        else True,
+        notification_frequency_hours=subscribe_data.notification_frequency_hours
+        if subscribe_data.notification_frequency_hours is not None
+        else 12,
+        notify_telegram=subscribe_data.notify_telegram
+        if subscribe_data.notify_telegram is not None
+        else (bool(current_user.telegram_chat_id) and current_user.telegram_notifications_enabled),
+        notify_email=subscribe_data.notify_email
+        if subscribe_data.notify_email is not None
+        else current_user.email_notifications_enabled,
+        notify_whatsapp=subscribe_data.notify_whatsapp
+        if subscribe_data.notify_whatsapp is not None
+        else False,
+    )
+
+    action_status = "created"
+    filter_obj: Optional[Filter]
+
+    if existing_filter:
+        filter_obj = crud_filter.update(
+            db=db,
+            db_obj=existing_filter,
+            obj_in=create_payload.dict()
+        )
+        action_status = "replaced"
+        logger.info("Фильтр пользователя %s заменён", current_user.id)
+    else:
+        filter_obj = crud_filter.create_with_owner(
+            db=db,
+            obj_in=create_payload,
+            user_id=current_user.id
+        )
+        logger.info("Создан новый фильтр для пользователя %s", current_user.id)
+
+    # Отправляем подтверждение в Telegram (если привязан)
+    if current_user.telegram_chat_id:
+        try:
+            await send_filter_confirmation_message(
+                current_user.telegram_chat_id,
+                filter_obj,
+                is_new=(action_status == "created")
+            )
+        except Exception as exc:
+            logger.error("Ошибка отправки подтверждения в Telegram: %s", exc)
+
+    message_map = {
+        "created": "Подписка успешно создана",
+        "replaced": "Подписка обновлена",
+    }
+
+    return FilterSubscribeResponse(
+        status=action_status,
+        message=message_map.get(action_status, "Подписка обработана"),
+        filter=filter_obj
+    )
 
 
 @router.get("/{filter_id}", response_model=Filter)

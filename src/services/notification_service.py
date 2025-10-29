@@ -107,12 +107,26 @@ class NotificationService:
                 logger.info(f"🐛 [DEBUG] Фильтр {filter_obj.id} неактивен")
                 return False
             
-            # Проверяем наличие хотя бы одного способа связи
-            has_telegram = bool(user.telegram_chat_id)
-            has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+            # Проверяем наличие хотя бы одного способа связи с учетом фильтра
+            has_telegram = bool(
+                user.telegram_chat_id and
+                user.telegram_notifications_enabled and
+                filter_obj.notify_telegram
+            )
+            has_email = bool(
+                (user.notification_email or user.email) and
+                user.email_notifications_enabled and
+                filter_obj.notify_email
+            )
+            has_whatsapp = bool(
+                user.whatsapp_phone and
+                user.whatsapp_enabled and
+                settings.WHATSAPP_ENABLED and
+                filter_obj.notify_whatsapp
+            )
             
-            if not has_telegram and not has_whatsapp:
-                logger.info(f"🐛 [DEBUG] У пользователя {user.email} нет активных способов уведомлений")
+            if not has_telegram and not has_email and not has_whatsapp:
+                logger.info(f"🐛 [DEBUG] Нет активных каналов уведомлений для фильтра {filter_obj.id}")
                 return False
             
             logger.info(f"🐛 [DEBUG] Режим отладки - пропускаем проверку времени для фильтра {filter_obj.id}")
@@ -123,19 +137,34 @@ class NotificationService:
             logger.info(f"❌ Фильтр {filter_obj.id} неактивен")
             return False
         
-        # Проверяем наличие хотя бы одного способа связи
-        has_telegram = bool(user.telegram_chat_id)
-        has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
+        # Проверяем наличие хотя бы одного способа связи с учетом фильтра
+        has_telegram = bool(
+            user.telegram_chat_id and
+            user.telegram_notifications_enabled and
+            filter_obj.notify_telegram
+        )
+        has_email = bool(
+            (user.notification_email or user.email) and
+            user.email_notifications_enabled and
+            filter_obj.notify_email
+        )
+        has_whatsapp = bool(
+            user.whatsapp_phone and
+            user.whatsapp_enabled and
+            settings.WHATSAPP_ENABLED and
+            filter_obj.notify_whatsapp
+        )
         
-        if not has_telegram and not has_whatsapp:
-            logger.info(f"❌ У пользователя {user.email} нет активных способов уведомлений")
+        if not has_telegram and not has_email and not has_whatsapp:
+            logger.info(f"❌ Нет активных каналов уведомлений для фильтра {filter_obj.id}")
             return False
         
-        # Определяем частоту уведомлений в зависимости от подписки
-        if user.subscription_type == "premium":
-            notification_frequency = timedelta(minutes=30)
-        else:
-            notification_frequency = timedelta(hours=24)
+        # Используем частоту из фильтра (по умолчанию 24 часа)
+        frequency_hours = filter_obj.notification_frequency_hours or 24
+        # Минимальное значение 1 час для безопасности
+        if frequency_hours < 1:
+            frequency_hours = 1
+        notification_frequency = timedelta(hours=frequency_hours)
         
         # Проверяем время последнего уведомления для этого фильтра
         if filter_obj.last_notification_sent:
@@ -257,12 +286,16 @@ class NotificationService:
                 .all()
             )
             
-            # Исключаем уже отправленные объявления
+            # ВСЕГДА исключаем уже отправленные объявления
+            new_listings = [
+                listing for listing in all_listings 
+                if listing.id not in sent_listing_ids
+            ]
+            
             if debug_mode:
-                # В режиме отладки НЕ исключаем отправленные объявления
-                new_listings = all_listings
-                logger.info(f"🐛 [DEBUG] Режим отладки: НЕ исключаем отправленные объявления")
-                logger.info(f"🐛 [DEBUG] Всего объявлений для отправки: {len(new_listings)}")
+                logger.info(f"🐛 [DEBUG] Найдено уже отправленных: {len(sent_listing_ids)}")
+                logger.info(f"🐛 [DEBUG] Всего объявлений по фильтру: {len(all_listings)}")
+                logger.info(f"🐛 [DEBUG] Новых объявлений для отправки: {len(new_listings)}")
                 
                 # Дополнительная статистика в режиме отладки
                 if new_listings:
@@ -272,11 +305,6 @@ class NotificationService:
                         new_source_stats[source] = new_source_stats.get(source, 0) + 1
                     logger.info(f"🐛 [DEBUG] К отправке по источникам: {new_source_stats}")
             else:
-                # Обычный режим - исключаем уже отправленные
-                new_listings = [
-                    listing for listing in all_listings 
-                    if listing.id not in sent_listing_ids
-                ]
                 logger.info(f"📋 Исключено {len(all_listings) - len(new_listings)} уже отправленных объявлений")
                 logger.info(f"✅ Найдено {len(new_listings)} новых объявлений для отправки")
                 
@@ -419,50 +447,55 @@ class NotificationService:
             
             # Отправка через Email (если включен в фильтре и у пользователя)
             if (filter_obj.notify_email and 
-                user.email and 
                 user.email_notifications_enabled):
                 try:
                     from src.services.email_service import email_service
                     from datetime import datetime, timedelta
                     
-                    # Проверяем, не отправляли ли мы недавно email (защита от спама)
-                    can_send_email = True
-                    if user.email_last_sent_at:
-                        # Минимум 1 час между email уведомлениями
-                        time_since_last = datetime.now(timezone.utc).replace(tzinfo=None) - user.email_last_sent_at
-                        if time_since_last < timedelta(hours=1):
-                            can_send_email = False
-                            logger.info(f"⏰ Email для {user.email} пропущен - слишком рано (прошло {time_since_last})")
+                    # Используем notification_email если он установлен, иначе основной email
+                    notification_email = user.notification_email or user.email
                     
-                    if can_send_email and email_service.is_enabled():
-                        # Конвертируем объекты Listing в словари для email
-                        listings_data = []
-                        for listing in listings[:10]:  # Email: максимум 10 объявлений
-                            listings_data.append({
-                                'title': listing.title,
-                                'price': listing.price,
-                                'address': listing.address,
-                                'city': listing.city,
-                                'rooms': listing.rooms,
-                                'area': listing.area,
-                                'url': listing.url,
-                                'source': listing.source
-                            })
+                    if not notification_email:
+                        logger.warning(f"⚠️ User {user.id} has no notification email configured")
+                    else:
+                        # Проверяем, не отправляли ли мы недавно email (защита от спама)
+                        can_send_email = True
+                        if user.email_last_sent_at:
+                            # Минимум 1 час между email уведомлениями
+                            time_since_last = datetime.now(timezone.utc).replace(tzinfo=None) - user.email_last_sent_at
+                            if time_since_last < timedelta(hours=1):
+                                can_send_email = False
+                                logger.info(f"⏰ Email для {notification_email} пропущен - слишком рано (прошло {time_since_last})")
                         
-                        email_sent = await email_service.send_listing_notification_email(
-                            to_email=user.email,
-                            listings=listings_data,
-                            filter_name=filter_obj.name
-                        )
-                        
-                        email_success = email_sent
-                        if email_success:
-                            # Обновляем время последней отправки email
-                            db = self.get_db()
-                            user.email_last_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
-                            db.add(user)
-                            db.commit()
-                            logger.info(f"📧 Email: отправлено уведомление с {len(listings_data)} объявлениями пользователю {user.email}")
+                        if can_send_email and email_service.is_enabled():
+                            # Конвертируем объекты Listing в словари для email
+                            listings_data = []
+                            for listing in listings[:10]:  # Email: максимум 10 объявлений
+                                listings_data.append({
+                                    'title': listing.title,
+                                    'price': listing.price,
+                                    'address': listing.address,
+                                    'city': listing.city,
+                                    'rooms': listing.rooms,
+                                    'area': listing.area,
+                                    'url': listing.url,
+                                    'source': listing.source
+                                })
+                            
+                            email_sent = await email_service.send_listing_notification_email(
+                                to_email=notification_email,
+                                listings=listings_data,
+                                filter_name=filter_obj.name
+                            )
+                            
+                            email_success = email_sent
+                            if email_success:
+                                # Обновляем время последней отправки email
+                                db = self.get_db()
+                                user.email_last_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                                db.add(user)
+                                db.commit()
+                                logger.info(f"📧 Email: отправлено уведомление с {len(listings_data)} объявлениями на {notification_email}")
                     
                 except Exception as e:
                     logger.error(f"Ошибка отправки Email уведомлений: {e}")
@@ -569,7 +602,7 @@ class NotificationService:
         
         # Проверяем наличие хотя бы одного способа связи
         has_telegram = bool(user.telegram_chat_id and user.telegram_notifications_enabled)
-        has_email = bool(user.email and user.email_notifications_enabled)
+        has_email = bool((user.notification_email or user.email) and user.email_notifications_enabled)
         has_whatsapp = bool(user.whatsapp_phone and user.whatsapp_enabled and settings.WHATSAPP_ENABLED)
         
         if not has_telegram and not has_email and not has_whatsapp:

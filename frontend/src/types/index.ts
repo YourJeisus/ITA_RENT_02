@@ -77,11 +77,10 @@ export interface ApiResponse<T> {
 
 export interface User {
   id: number;
-  email: string;
-  first_name?: string;
+  email: string; // Email для логина
+  first_name: string;
   last_name?: string;
-  is_active: boolean;
-  is_superuser: boolean;
+  notification_email?: string; // Отдельный email для рассылки
   telegram_chat_id?: string;
   telegram_username?: string;
   whatsapp_phone?: string;

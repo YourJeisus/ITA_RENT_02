@@ -67,6 +67,7 @@ class UserResponse(BaseModel):
     """Схема ответа с информацией о пользователе"""
     id: int
     email: EmailStr
+    notification_email: Optional[str] = None  # Отдельный email для рассылки
     first_name: str
     last_name: Optional[str] = None
     subscription_type: str

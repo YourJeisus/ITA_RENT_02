@@ -1,7 +1,7 @@
 """
 Pydantic схемы для фильтров
 """
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 from pydantic import BaseModel, field_validator
 
@@ -140,6 +140,38 @@ class FilterResponse(BaseModel):
     """Схема ответа со списком фильтров"""
     filters: List[Filter]
     total: int
+
+
+class FilterSubscribeRequest(BaseModel):
+    """Схема запроса для подписки на фильтр"""
+    name: Optional[str] = None
+    city: Optional[str] = None
+    min_price: Optional[int] = None
+    max_price: Optional[int] = None
+    min_rooms: Optional[int] = None
+    max_rooms: Optional[int] = None
+    property_type: Optional[str] = None
+    min_area: Optional[int] = None
+    max_area: Optional[int] = None
+    furnished: Optional[bool] = None
+    pets_allowed: Optional[bool] = None
+    notification_enabled: Optional[bool] = None
+    notification_frequency_hours: Optional[int] = None
+    notify_telegram: Optional[bool] = None
+    notify_email: Optional[bool] = None
+    notify_whatsapp: Optional[bool] = None
+    force_replace: bool = False
+
+
+class FilterSubscribeResponse(BaseModel):
+    """Ответ на подписку на фильтр"""
+    status: Literal["created", "replaced", "needs_confirmation"]
+    message: str
+    filter: Optional[Filter] = None
+    existing_filter: Optional[Filter] = None
+
+    class Config:
+        from_attributes = True
 
 
 class FilterToggle(BaseModel):

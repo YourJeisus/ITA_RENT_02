@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # Воркер настройки
     SCRAPER_WORKER_INTERVAL_HOURS: int = 6
     SCRAPER_WORKER_MAX_PAGES: int = 10
+    NOTIFICATION_WORKER_INTERVAL_SECONDS: int = 43200  # 12 часов по умолчанию
+    NOTIFICATION_WORKER_DEBUG_INTERVAL_SECONDS: int = 15  # 15 секунд в отладке
     
     # Мониторинг
     SENTRY_DSN: str = ""
@@ -90,6 +92,12 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
+    
+    # Email API (Mailtrap, SendGrid, etc)
+    EMAIL_API_PROVIDER: str = "mailtrap"  # mailtrap, sendgrid, resend
+    MAILTRAP_API_TOKEN: str = ""
+    MAILTRAP_ACCOUNT_ID: str = ""
+    MAILTRAP_SENDER_EMAIL: str = "noreply@sandbox.mailtrap.io"
     
     # CORS - обновленные домены Railway + Vercel
     BACKEND_CORS_ORIGINS: List[str] = [

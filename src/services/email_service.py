@@ -1,13 +1,11 @@
 """
 Email сервис для ITA_RENT_BOT
-Отправка уведомлений по электронной почте через SMTP
+Отправка уведомлений по электронной почте через Mailtrap Email API или SMTP
 """
 import logging
-import smtplib
 import asyncio
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import Optional, List
+import requests
+from typing import Optional
 from datetime import datetime
 
 from src.core.config import settings
@@ -16,22 +14,25 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Сервис для отправки email уведомлений"""
+    """Сервис для отправки email уведомлений через Mailtrap API"""
     
     def __init__(self):
-        self.smtp_host = settings.SMTP_HOST
-        self.smtp_port = settings.SMTP_PORT
-        self.smtp_username = settings.SMTP_USERNAME
-        self.smtp_password = settings.SMTP_PASSWORD
-        self.from_email = settings.SMTP_USERNAME or "noreply@itarent.com"
+        self.provider = settings.EMAIL_API_PROVIDER
+        self.mailtrap_token = settings.MAILTRAP_API_TOKEN
+        self.mailtrap_account_id = settings.MAILTRAP_ACCOUNT_ID
+        self.sender_email = settings.MAILTRAP_SENDER_EMAIL
         
         # Проверка наличия необходимых настроек
-        if not all([self.smtp_host, self.smtp_port, self.smtp_username, self.smtp_password]):
-            logger.warning("⚠️ Email настройки не полностью сконфигурированы. Email уведомления будут отключены.")
-            self.enabled = False
+        if self.provider == "mailtrap":
+            if not all([self.mailtrap_token, self.mailtrap_account_id]):
+                logger.warning("⚠️ Mailtrap Email API настройки не полностью сконфигурированы.")
+                self.enabled = False
+            else:
+                self.enabled = True
+                logger.info(f"✅ Email сервис инициализирован: Mailtrap Email API")
         else:
-            self.enabled = True
-            logger.info(f"✅ Email сервис инициализирован: {self.smtp_host}:{self.smtp_port}")
+            logger.warning(f"⚠️ Неизвестный email provider: {self.provider}")
+            self.enabled = False
     
     def is_enabled(self) -> bool:
         """Проверка доступности email сервиса"""
@@ -45,7 +46,7 @@ class EmailService:
         html_body: Optional[str] = None
     ) -> bool:
         """
-        Отправка email сообщения
+        Отправка email сообщения через Mailtrap API
         
         Args:
             to_email: Email получателя
@@ -61,52 +62,71 @@ class EmailService:
             return False
         
         try:
-            # Создаем сообщение
-            message = MIMEMultipart('alternative')
-            message['Subject'] = subject
-            message['From'] = self.from_email
-            message['To'] = to_email
-            
-            # Добавляем текстовую версию
-            text_part = MIMEText(body, 'plain', 'utf-8')
-            message.attach(text_part)
-            
-            # Добавляем HTML версию если есть
-            if html_body:
-                html_part = MIMEText(html_body, 'html', 'utf-8')
-                message.attach(html_part)
-            
-            # Подключаемся к SMTP серверу и отправляем
-            try:
-                server = smtplib.SMTP(self.smtp_host, int(self.smtp_port))
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(message)
-                server.quit()
-            except Exception as smtp_error:
-                logger.error(f"❌ SMTP ошибка для {to_email}: {smtp_error}")
-                return False
-            
-            logger.info(f"📧 Email отправлен на {to_email}: {subject}")
-            return True
+            # Используем asyncio.to_thread для асинхронного выполнения синхронного кода
+            result = await asyncio.to_thread(
+                self._send_via_mailtrap_api,
+                to_email,
+                subject,
+                body,
+                html_body
+            )
+            return result
             
         except Exception as e:
             logger.error(f"❌ Ошибка отправки email на {to_email}: {e}")
             return False
     
-    def _send_smtp_message(self, message: MIMEMultipart):
+    def _send_via_mailtrap_api(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        html_body: Optional[str] = None
+    ) -> bool:
         """
-        Синхронная отправка через SMTP
-        (Больше не используется, но оставляем для совместимости)
+        Отправка через Mailtrap API (синхронный метод)
         """
         try:
-            with smtplib.SMTP(self.smtp_host, int(self.smtp_port)) as server:
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(message)
+            url = f"https://send.api.mailtrap.io/api/send"
+            
+            # Подготавливаем payload
+            payload = {
+                "from": {
+                    "email": self.sender_email,
+                    "name": "ITA Rent Bot"
+                },
+                "to": [
+                    {
+                        "email": to_email
+                    }
+                ],
+                "subject": subject,
+                "text": body,
+                "category": "notification"
+            }
+            
+            # Добавляем HTML если есть
+            if html_body:
+                payload["html"] = html_body
+            
+            # Отправляем запрос
+            headers = {
+                "Authorization": f"Bearer {self.mailtrap_token}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"✅ Email успешно отправлен на {to_email}")
+                return True
+            else:
+                logger.error(f"❌ Mailtrap API ошибка: {response.status_code} - {response.text}")
+                return False
+                
         except Exception as e:
-            logger.error(f"❌ SMTP сервис ошибка: {e}")
-            raise
+            logger.error(f"❌ Ошибка Mailtrap API для {to_email}: {e}")
+            return False
     
     async def send_listing_notification_email(
         self,

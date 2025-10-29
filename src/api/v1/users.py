@@ -27,12 +27,17 @@ def get_current_user_profile(
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
+        notification_email=current_user.notification_email,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
         subscription_type=current_user.subscription_type,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
-        updated_at=current_user.updated_at
+        updated_at=current_user.updated_at,
+        telegram_chat_id=current_user.telegram_chat_id,
+        telegram_username=current_user.telegram_username,
+        email_notifications_enabled=current_user.email_notifications_enabled,
+        telegram_notifications_enabled=current_user.telegram_notifications_enabled
     )
 
 
@@ -162,10 +167,13 @@ async def send_test_email_notification(
     """
     Отправка тестового email уведомления
     """
-    if not current_user.email:
+    # Используем notification_email если он установлен, иначе основной email
+    notification_email = current_user.notification_email or current_user.email
+    
+    if not notification_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email не указан"
+            detail="Email не указан для рассылки"
         )
     
     if not current_user.email_notifications_enabled:
@@ -183,7 +191,7 @@ async def send_test_email_notification(
                 detail="Email сервис не настроен"
             )
         
-        success = await email_service.send_test_email(current_user.email)
+        success = await email_service.send_test_email(notification_email)
         
         if success:
             return {"status": "sent", "message": "Тестовое email уведомление отправлено"}
@@ -209,6 +217,9 @@ import secrets
 import string
 from datetime import datetime, timedelta
 
+# Глобальное хранилище кодов (в production использовать Redis)
+_email_change_codes = {}
+
 def generate_verification_code(length: int = 6) -> str:
     """Генерация 6-значного кода верификации"""
     digits = string.digits
@@ -217,31 +228,24 @@ def generate_verification_code(length: int = 6) -> str:
 
 @router.post("/email/change-request")
 async def request_email_change(
-    new_email: str,
+    new_notification_email: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> dict:
     """
-    Запрос на смену email - отправляет код верификации на новый email
+    Запрос на смену email для рассылки уведомлений
+    Это отдельный email от учетной записи!
     """
-    if not new_email or "@" not in new_email:
+    if not new_notification_email or "@" not in new_notification_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Некорректный email адрес"
         )
     
-    if new_email == current_user.email:
+    if new_notification_email == current_user.notification_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Новый email совпадает с текущим"
-        )
-    
-    # Проверяем что такой email еще не занят
-    existing = db.query(User).filter(User.email == new_email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Этот email уже зарегистрирован"
+            detail="Это уже текущий email для рассылки"
         )
     
     try:
@@ -256,22 +260,20 @@ async def request_email_change(
         # Генерируем код верификации
         code = generate_verification_code()
         
-        # Сохраняем временные данные (в реальном приложении использовать Redis)
-        # Для MVP хранним в памяти с временем истечения
-        if not hasattr(current_user, '_email_change_requests'):
-            current_user._email_change_requests = {}
-        
-        current_user._email_change_requests[new_email] = {
+        # Сохраняем код в глобальное хранилище
+        code_key = f"{current_user.id}:notification_email:{new_notification_email}"
+        _email_change_codes[code_key] = {
             'code': code,
+            'created_at': datetime.now(),
             'expires_at': datetime.now() + timedelta(minutes=15)
         }
         
         # Отправляем код на новый email
-        subject = "🔐 ITA Rent: Код подтверждения смены email"
+        subject = "🔐 ITA Rent: Код подтверждения смены email для рассылки"
         body = f"""
 Привет!
 
-Вы запросили смену email адреса на сервисе ITA Rent.
+Вы запросили изменение email для получения уведомлений на сервисе ITA Rent.
 
 Ваш код подтверждения: {code}
 
@@ -291,8 +293,8 @@ async def request_email_change(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 500px; margin: 0 auto;">
-                <h2>🔐 Код подтверждения смены email</h2>
-                <p>Вы запросили смену email адреса на сервисе ITA Rent.</p>
+                <h2>🔐 Код подтверждения смены email для рассылки</h2>
+                <p>Вы запросили изменение email для получения уведомлений на сервисе ITA Rent.</p>
                 
                 <div style="background: #f0f0f0; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
                     <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{code}</p>
@@ -311,13 +313,13 @@ async def request_email_change(
         </html>
         """
         
-        success = await email_service.send_email(new_email, subject, body, html_body)
+        success = await email_service.send_email(new_notification_email, subject, body, html_body)
         
         if success:
             return {
                 "status": "code_sent",
-                "message": f"Код верификации отправлен на {new_email}",
-                "new_email": new_email
+                "message": f"Код верификации отправлен на {new_notification_email}",
+                "new_email": new_notification_email
             }
         else:
             raise HTTPException(
@@ -328,7 +330,7 @@ async def request_email_change(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error requesting email change: {e}")
+        logger.error(f"Error requesting notification email change: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при запросе смены email"
@@ -337,13 +339,13 @@ async def request_email_change(
 
 @router.post("/email/change-confirm")
 def confirm_email_change(
-    new_email: str,
+    new_notification_email: str,
     code: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> dict:
     """
-    Подтверждение смены email по коду верификации
+    Подтверждение смены email для рассылки по коду верификации
     """
     if not code or len(code) != 6 or not code.isdigit():
         raise HTTPException(
@@ -353,17 +355,19 @@ def confirm_email_change(
     
     try:
         # Проверяем код
-        if not hasattr(current_user, '_email_change_requests') or new_email not in current_user._email_change_requests:
+        code_key = f"{current_user.id}:notification_email:{new_notification_email}"
+        
+        if code_key not in _email_change_codes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Запрос смены email не найден. Начните заново."
             )
         
-        request_data = current_user._email_change_requests[new_email]
+        request_data = _email_change_codes[code_key]
         
         # Проверяем истечение времени
         if datetime.now() > request_data['expires_at']:
-            del current_user._email_change_requests[new_email]
+            del _email_change_codes[code_key]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Код верификации истек. Запросите новый код."
@@ -376,9 +380,9 @@ def confirm_email_change(
                 detail="Неверный код верификации"
             )
         
-        # Обновляем email
-        old_email = current_user.email
-        current_user.email = new_email
+        # Обновляем email для рассылки (НЕ меняем email для логина!)
+        old_notification_email = current_user.notification_email
+        current_user.notification_email = new_notification_email
         current_user.email_verified_at = datetime.now()
         
         db.add(current_user)
@@ -386,20 +390,20 @@ def confirm_email_change(
         db.refresh(current_user)
         
         # Удаляем использованный запрос
-        del current_user._email_change_requests[new_email]
+        del _email_change_codes[code_key]
         
-        logger.info(f"Email changed for user {current_user.id}: {old_email} -> {new_email}")
+        logger.info(f"Notification email changed for user {current_user.id}: {old_notification_email} -> {new_notification_email}")
         
         return {
             "status": "success",
-            "message": "Email успешно изменен",
-            "new_email": new_email
+            "message": "Email для рассылки успешно изменен",
+            "new_email": new_notification_email
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error confirming email change: {e}")
+        logger.error(f"Error confirming notification email change: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при подтверждении смены email"

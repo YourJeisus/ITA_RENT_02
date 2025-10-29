@@ -47,6 +47,7 @@ class User(Base):
     whatsapp_enabled: Mapped[bool] = mapped_column(default=False, index=True)
     
     # Настройки уведомлений
+    notification_email: Mapped[Optional[str]] = mapped_column(String(255), index=True)  # Отдельный email для рассылки
     email_notifications_enabled: Mapped[bool] = mapped_column(default=True, index=True)
     telegram_notifications_enabled: Mapped[bool] = mapped_column(default=True, index=True)
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

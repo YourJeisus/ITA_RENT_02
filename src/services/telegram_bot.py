@@ -489,13 +489,19 @@ async def send_listing_notification(
                     ))
             
             if media_group:
-                # Отправляем медиа-группу с подписью
-                await telegram_bot.application.bot.send_media_group(
-                    chat_id=telegram_chat_id,
-                    media=media_group
-                )
-                logger.info(f"Уведомление с фото отправлено в чат {telegram_chat_id}")
-                return True
+                try:
+                    # Отправляем медиа-группу с подписью
+                    await telegram_bot.application.bot.send_media_group(
+                        chat_id=telegram_chat_id,
+                        media=media_group
+                    )
+                    logger.info(f"Уведомление с фото отправлено в чат {telegram_chat_id}")
+                    return True
+                except Exception as media_error:
+                    logger.warning(
+                        "Не удалось отправить медиа-группу в Telegram (%s). Падаем на текстовое сообщение.",
+                        media_error
+                    )
         
         # Если нет фото - отправляем просто текст
         await telegram_bot.application.bot.send_message(

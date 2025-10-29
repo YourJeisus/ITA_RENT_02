@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { CircularProgress, Alert, Pagination, Box } from "@mui/material";
 import NewListingCard from "../components/search/NewListingCard/NewListingCard";
 import NewFiltersSidebar from "../components/search/NewFiltersSidebar/NewFiltersSidebar";
@@ -9,22 +9,37 @@ import { useListingStore } from "../store/listingStore";
 import { FilterState } from "../types";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { useAuthStore } from "../store/authStore";
+import {
+  filtersService,
+  FilterSubscribePayload,
+  FilterSubscribeResponse,
+} from "../services/filtersService";
 
 const NewSearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [page, setPage] = useState(1);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [subscribeMessage, setSubscribeMessage] = useState<string | null>(null);
+  const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
-  const {
-    listings,
-    totalListings,
-    isLoading,
-    error,
-    fetchListings,
-    listingsPerPage,
-  } = useListingStore();
+  // Отдельные селекторы для каждого значения - предотвращает бесконечные ре-рендеры
+  const listings = useListingStore((state) => state.listings);
+  const totalListings = useListingStore((state) => state.totalListings);
+  const isLoading = useListingStore((state) => state.isLoading);
+  const error = useListingStore((state) => state.error);
+  const listingsPerPage = useListingStore((state) => state.listingsPerPage);
 
-  const totalPages = Math.ceil(totalListings / listingsPerPage);
+  const totalPages = useMemo(
+    () => Math.ceil(totalListings / listingsPerPage || 1),
+    [totalListings, listingsPerPage]
+  );
+
+  // Отдельные селекторы для authStore тоже
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // Маппинг английских названий городов в итальянские
   const cityMapping: {
@@ -89,8 +104,9 @@ const NewSearchResultsPage: React.FC = () => {
       locationQuery: "",
     };
 
-    fetchListings(filtersForStore, page);
-  }, [searchParams, page, fetchListings]);
+    // Вызываем fetchListings через getState() чтобы избежать зависимости от функции
+    useListingStore.getState().fetchListings(filtersForStore, page);
+  }, [searchParams, page]);
 
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
@@ -107,6 +123,168 @@ const NewSearchResultsPage: React.FC = () => {
   const mapCenter = useMemo<[number, number]>(() => {
     return cityData.coords;
   }, [cityData]);
+
+  const buildRoomsConstraints = useCallback(() => {
+    const roomParams = searchParams.getAll("rooms");
+    if (roomParams.length === 0) {
+      return {
+        min_rooms: null as number | null,
+        max_rooms: null as number | null,
+      };
+    }
+
+    let hasStudio = false;
+    let hasFivePlus = false;
+    const numericValues: number[] = [];
+
+    roomParams.forEach((value) => {
+      if (value === "studio") {
+        hasStudio = true;
+        numericValues.push(0);
+        return;
+      }
+
+      if (value === "5+") {
+        hasFivePlus = true;
+        numericValues.push(5);
+        return;
+      }
+
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        numericValues.push(parsed);
+      }
+    });
+
+    if (numericValues.length === 0) {
+      return {
+        min_rooms: null as number | null,
+        max_rooms: null as number | null,
+      };
+    }
+
+    const minRooms = Math.min(...numericValues);
+    let maxRooms: number | null = Math.max(...numericValues);
+
+    if (hasFivePlus) {
+      maxRooms = null;
+    }
+
+    if (hasStudio && numericValues.length === 1) {
+      return { min_rooms: 0, max_rooms: 0 };
+    }
+
+    return {
+      min_rooms: minRooms,
+      max_rooms: maxRooms,
+    };
+  }, [searchParams]);
+
+  const buildSubscribePayload = useCallback(
+    (forceReplace = false): FilterSubscribePayload => {
+      const { min_rooms, max_rooms } = buildRoomsConstraints();
+
+      const priceMin = searchParams.get("price_min");
+      const priceMax = searchParams.get("price_max");
+      const minArea = searchParams.get("min_area");
+      const maxArea = searchParams.get("max_area");
+      const propertyTypeParam = searchParams.getAll("property_type");
+      const propertyType = propertyTypeParam.length
+        ? propertyTypeParam[0]
+        : null;
+
+      const payload: FilterSubscribePayload = {
+        name: `Search in ${cityDisplay}`,
+        city: cityData.id,
+        min_price: priceMin ? Number(priceMin) : null,
+        max_price: priceMax ? Number(priceMax) : null,
+        min_rooms,
+        max_rooms,
+        property_type: propertyType,
+        min_area: minArea ? Number(minArea) : null,
+        max_area: maxArea ? Number(maxArea) : null,
+        notification_enabled: true,
+        notification_frequency_hours: 12,
+        notify_email: user?.email_notifications_enabled ?? true,
+        notify_telegram:
+          (Boolean(user?.telegram_chat_id) &&
+            (user?.telegram_notifications_enabled ?? true)) ||
+          false,
+        notify_whatsapp: false,
+        force_replace: forceReplace,
+      };
+
+      return payload;
+    },
+    [
+      buildRoomsConstraints,
+      cityData.id,
+      cityDisplay,
+      searchParams,
+      user?.email_notifications_enabled,
+      user?.telegram_chat_id,
+      user?.telegram_notifications_enabled,
+    ]
+  );
+
+  const handleSubscribe = useCallback(async () => {
+    setSubscribeMessage(null);
+    setSubscribeError(null);
+
+    if (!isAuthenticated) {
+      navigate(
+        `/login?next=${encodeURIComponent(
+          `${location.pathname}${location.search}`
+        )}`
+      );
+      return;
+    }
+
+    setSubscribeLoading(true);
+
+    const attemptSubscription = async (
+      forceReplace: boolean
+    ): Promise<FilterSubscribeResponse> => {
+      const payload = buildSubscribePayload(forceReplace);
+      return filtersService.subscribeToFilter(payload);
+    };
+
+    try {
+      const response = await attemptSubscription(false);
+
+      if (response.status === "needs_confirmation") {
+        const userConfirmed = window.confirm(
+          response.message ||
+            "У вас уже есть подписка на фильтр. Заменить существующий фильтр?"
+        );
+
+        if (!userConfirmed) {
+          setSubscribeMessage("Подписка оставлена без изменений");
+          setSubscribeLoading(false);
+          return;
+        }
+
+        const confirmResponse = await attemptSubscription(true);
+        setSubscribeMessage(confirmResponse.message);
+      } else {
+        setSubscribeMessage(response.message);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Не удалось оформить подписку. Попробуйте позже.";
+      setSubscribeError(message);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  }, [
+    buildSubscribePayload,
+    isAuthenticated,
+    navigate,
+    location.pathname,
+    location.search,
+  ]);
 
   return (
     <div className="bg-[#eaf4fd] min-h-screen">
@@ -125,7 +303,7 @@ const NewSearchResultsPage: React.FC = () => {
         </h1>
 
         {/* Count */}
-        <div className="flex items-center gap-[16px] mb-[24px]">
+        <div className="flex flex-wrap items-center gap-[16px] mb-[24px]">
           <p className="font-normal text-[16px] leading-[24px] text-gray-900">
             {totalListings.toLocaleString()} apartments
           </p>
@@ -147,7 +325,24 @@ const NewSearchResultsPage: React.FC = () => {
               />
             </svg>
           </button>
+          <button
+            type="button"
+            onClick={handleSubscribe}
+            disabled={subscribeLoading}
+            className="ml-auto px-[20px] py-[10px] bg-blue-600 text-white rounded-[8px] font-semibold text-[15px] hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {subscribeLoading ? "Subscribing..." : "Subscribe to this search"}
+          </button>
         </div>
+
+        {subscribeMessage && (
+          <div className="mb-4 text-[14px] text-green-600">
+            {subscribeMessage}
+          </div>
+        )}
+        {subscribeError && (
+          <div className="mb-4 text-[14px] text-red-600">{subscribeError}</div>
+        )}
 
         {/* Main content: Sidebar + Listings grid */}
         <div className="flex gap-[24px]">

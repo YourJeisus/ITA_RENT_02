@@ -1,159 +1,107 @@
 #!/usr/bin/env python3
-"""
-Запуск notification worker в бесконечном цикле
-Замена для shell команды while true в Docker
-"""
-import os
-import sys
+"""Runner for the notification worker."""
+
+import argparse
 import asyncio
 import logging
+import os
+import sys
 from pathlib import Path
 
-# Добавляем корневую папку в путь
+from dotenv import load_dotenv
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+load_dotenv(ROOT_DIR / ".env")
 
-def load_environment():
-    """Загрузка переменных окружения"""
+from src.core.config import settings  # noqa: E402
+from src.workers.notification_worker import NotificationWorker  # noqa: E402
+
+
+def configure_logging(debug: bool) -> None:
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Launch notification worker to dispatch user alerts"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        help="Override interval between runs in seconds",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run only a single notification cycle",
+    )
+    parser.add_argument(
+        "--delay-first",
+        action="store_true",
+        help="Wait for one interval before the first run",
+    )
+    return parser.parse_args()
+
+
+def validate_environment() -> None:
+    missing = []
+    if not settings.DATABASE_URL:
+        missing.append("DATABASE_URL")
+
+    if missing:
+        raise RuntimeError(
+            "Отсутствуют обязательные переменные окружения: " + ", ".join(missing)
+        )
+
+    if not settings.TELEGRAM_BOT_TOKEN:
+        logging.getLogger(__name__).warning(
+            "⚠️ TELEGRAM_BOT_TOKEN не установлен. Telegram уведомления будут отключены."
+        )
+
+
+async def async_main(args: argparse.Namespace) -> None:
+    worker = NotificationWorker(
+        interval_seconds=args.interval,
+        run_once=args.once,
+        run_immediately=not args.delay_first,
+    )
+    await worker.run()
+
+
+def main() -> None:
+    args = parse_args()
+    configure_logging(settings.DEBUG_NOTIFICATIONS)
+
     try:
-        from dotenv import load_dotenv
-        load_dotenv(dotenv_path=ROOT_DIR / '.env')
-        logger.info("✅ Переменные окружения загружены")
-    except ImportError:
-        logger.info("📝 python-dotenv не установлен, используем системные переменные")
-
-def check_required_env_vars():
-    """Проверка обязательных переменных окружения"""
-    required_vars = {
-        "TELEGRAM_BOT_TOKEN": "Токен Telegram бота",
-        "DATABASE_URL": "URL базы данных",
-        "SECRET_KEY": "Секретный ключ"
-    }
-    
-    missing_vars = []
-    for var, description in required_vars.items():
-        if not os.getenv(var):
-            missing_vars.append(f"{var} ({description})")
-    
-    if missing_vars:
-        logger.error("❌ Отсутствуют обязательные переменные окружения:")
-        for var in missing_vars:
-            logger.error(f"   - {var}")
-        return False
-    
-    logger.info("✅ Все обязательные переменные окружения установлены")
-    return True
-
-async def run_notification_dispatcher():
-    """Запуск диспетчера уведомлений"""
-    try:
-        logger.info("🔔 Запуск диспетчера уведомлений...")
-        
-        # Импортируем и запускаем диспетчер
-        from src.services.notification_service import run_notification_dispatcher
-        
-        result = await run_notification_dispatcher()
-        
-        if result:
-            # Подробная статистика
-            users_processed = result.get('users_processed', 0)
-            notifications_sent = result.get('notifications_sent', 0)
-            errors = result.get('errors', 0)
-            
-            logger.info(f"✅ Диспетчер завершен успешно:")
-            logger.info(f"   👥 Пользователей обработано: {users_processed}")
-            logger.info(f"   📨 Уведомлений отправлено: {notifications_sent}")
-            logger.info(f"   ❌ Ошибок: {errors}")
-            
-            if notifications_sent == 0 and users_processed > 0:
-                logger.info("   ℹ️ Новых уведомлений для отправки не найдено")
-            elif notifications_sent > 0:
-                logger.info(f"   🎉 Успешно отправлено {notifications_sent} уведомлений!")
-        else:
-            logger.warning("⚠️ Диспетчер вернул пустой результат")
-            
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка в диспетчере уведомлений: {e}")
-        return False
-
-async def main():
-    """Главный цикл notification worker"""
-    logger.info("🔔 Запуск Notification Worker...")
-    
-    # Загружаем переменные окружения
-    load_environment()
-    
-    # Проверяем переменные окружения
-    if not check_required_env_vars():
+        validate_environment()
+    except RuntimeError as exc:
+        logging.getLogger(__name__).error("❌ %s", exc)
         sys.exit(1)
-    
-    # Проверяем режим отладки  
-    from src.core.config import settings
-    debug_mode = settings.DEBUG_NOTIFICATIONS
-    
-    # Получаем интервал из переменной окружения
-    if debug_mode:
-        # В режиме отладки используем переменную или 300 секунд (5 минут) по умолчанию
-        default_interval = 300
-        interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", str(default_interval)))
-        logger.info("🐛 РЕЖИМ ОТЛАДКИ ВКЛЮЧЕН!")
-        logger.info("   - Временные ограничения отключены")
-        logger.info("   - Уведомления при каждом запуске")
-        logger.info(f"   - Интервал: {interval_seconds} секунд")
-    else:
-        # Обычный режим - интервал между запусками (30 минут = 1800 секунд)
-        interval_seconds = int(os.getenv("NOTIFICATION_INTERVAL_SECONDS", "1800"))
-    
-    logger.info(f"⏰ Интервал уведомлений: {interval_seconds} секунд ({interval_seconds//60} минут)")
-    
-    # Бесконечный цикл
-    iteration = 0
-    while True:
-        iteration += 1
-        
-        if debug_mode:
-            logger.info(f"🐛 [DEBUG] Итерация #{iteration} - запуск диспетчера уведомлений")
-        else:
-            logger.info(f"🔄 Итерация #{iteration} - запуск диспетчера уведомлений")
-        
-        try:
-            # Запускаем диспетчер уведомлений
-            success = await run_notification_dispatcher()
-            
-            if success:
-                if debug_mode:
-                    logger.info(f"🐛 [DEBUG] Итерация #{iteration} завершена успешно")
-                else:
-                    logger.info(f"✅ Итерация #{iteration} завершена успешно")
-            else:
-                logger.warning(f"⚠️ Итерация #{iteration} завершена с ошибками")
-                
-        except Exception as e:
-            logger.error(f"❌ Критическая ошибка в итерации #{iteration}: {e}")
-        
-        # Ожидание до следующего запуска
-        if debug_mode:
-            logger.info(f"🐛 [DEBUG] Ожидание {interval_seconds} секунд до следующего запуска...")
-        else:
-            logger.info(f"⏳ Ожидание {interval_seconds} секунд до следующего запуска...")
-        
-        await asyncio.sleep(interval_seconds)
+
+    try:
+        asyncio.run(async_main(args))
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).info("🛑 Notification worker остановлен пользователем")
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("❌ Критическая ошибка notification worker")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("🛑 Получен сигнал остановки")
-    except Exception as e:
-        logger.error(f"❌ Критическая ошибка: {e}")
-        sys.exit(1) 
+    # Railway convention: WORKER_TYPE=notifications для запуска этого воркера
+    worker_type = os.getenv("WORKER_TYPE", "").lower()
+    if worker_type and worker_type not in {"notification", "notifications"}:
+        logging.getLogger(__name__).error(
+            "❌ Неверный тип воркера: %s. Ожидается: notification", worker_type
+        )
+        sys.exit(1)
+
+    main() 

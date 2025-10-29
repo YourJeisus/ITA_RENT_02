@@ -94,20 +94,25 @@ class ListingsService {
 
   // Конвертируем FilterState в параметры поиска
   convertFiltersToSearchParams(filters: FilterState): SearchParams {
+    let minRooms: number | undefined = undefined;
+    let maxRooms: number | undefined = undefined;
+
+    if (filters.rooms && filters.rooms.length > 0) {
+      const validRooms = filters.rooms.filter((r) => !isNaN(r) && isFinite(r));
+      if (validRooms.length > 0) {
+        minRooms = Math.min(...validRooms);
+        maxRooms = Math.max(...validRooms);
+      }
+    }
+
     return {
       city: filters.city?.id || undefined,
       min_price: filters.priceMin || undefined,
       max_price: filters.priceMax || undefined,
       property_type:
         filters.propertyType === "all" ? undefined : filters.propertyType,
-      min_rooms:
-        filters.rooms && filters.rooms.length > 0
-          ? Math.min(...filters.rooms)
-          : undefined,
-      max_rooms:
-        filters.rooms && filters.rooms.length > 0
-          ? Math.max(...filters.rooms)
-          : undefined,
+      min_rooms: minRooms,
+      max_rooms: maxRooms,
       min_area: filters.areaMin || undefined,
       max_area: filters.areaMax || undefined,
     };

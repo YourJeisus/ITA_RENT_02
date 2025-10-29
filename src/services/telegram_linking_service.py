@@ -3,111 +3,116 @@
 Хранит коды связки в памяти с автоматическим истечением
 """
 import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+import time
+import json
+import os
+from typing import Dict, Any, Optional
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-
 class TelegramLinkingService:
-    """Управление кодами привязки Telegram аккаунтов"""
-    
-    def __init__(self):
-        self.codes: Dict[str, Dict[str, Any]] = {}
-        self.code_ttl_hours = 24  # Коды действительны 24 часа
-    
-    def store_code(self, code: str, telegram_id: int, telegram_username: Optional[str], chat_id: int) -> None:
-        """
-        Сохранить код привязки
+    """
+    Сервис для управления временными кодами связки Telegram аккаунтов.
+    Использует файловую систему для хранения кодов (работает между процессами).
+    """
+    def __init__(self, expiry_seconds: int = 86400, storage_dir: str = "/tmp"):  # 24 часа
+        self.expiry_seconds = expiry_seconds
+        self.storage_dir = Path(storage_dir)
+        self.codes_file = self.storage_dir / "telegram_linking_codes.json"
         
-        Args:
-            code: Код для привязки
-            telegram_id: ID Telegram пользователя
-            telegram_username: Username Telegram пользователя
-            chat_id: ID чата Telegram
-        """
-        self.codes[code] = {
+        # Создаём директорию если её нет
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"✅ TelegramLinkingService инициализирован. Хранилище: {self.codes_file}")
+        logger.info(f"   Коды истекают через {expiry_seconds} секунд.")
+    
+    def _load_codes(self) -> Dict[str, Dict[str, Any]]:
+        """Загружает коды из файла"""
+        if self.codes_file.exists():
+            try:
+                with open(self.codes_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка чтения файла кодов: {e}")
+                return {}
+        return {}
+    
+    def _save_codes(self, codes: Dict[str, Dict[str, Any]]):
+        """Сохраняет коды в файл"""
+        try:
+            with open(self.codes_file, 'w', encoding='utf-8') as f:
+                json.dump(codes, f, indent=2)
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения файла кодов: {e}")
+    
+    def _cleanup_expired(self, codes: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """Удаляет истёкшие коды"""
+        current_time = time.time()
+        valid_codes = {}
+        
+        for code, data in codes.items():
+            if (current_time - data['created_at']) < self.expiry_seconds:
+                valid_codes[code] = data
+            else:
+                logger.debug(f"🗑️ Код '{code}' истек и удален.")
+        
+        return valid_codes
+
+    def store_code(self, code: str, telegram_id: int, telegram_username: Optional[str], chat_id: int):
+        """Сохраняет код связки с данными пользователя Telegram"""
+        codes = self._load_codes()
+        
+        # Очищаем старые коды
+        codes = self._cleanup_expired(codes)
+        
+        # Добавляем новый код
+        codes[code] = {
             'telegram_id': telegram_id,
             'telegram_username': telegram_username,
             'chat_id': chat_id,
-            'created_at': datetime.now(),
-            'expires_at': datetime.now() + timedelta(hours=self.code_ttl_hours)
+            'created_at': time.time()
         }
-        logger.info(f"📝 Код привязки создан: {code} для Telegram user {telegram_id}")
-    
+        
+        self._save_codes(codes)
+        logger.info(f"🔗 Код связки '{code}' сохранен для Telegram ID: {telegram_id}")
+
     def get_code(self, code: str) -> Optional[Dict[str, Any]]:
-        """
-        Получить данные по коду с проверкой истечения
+        """Возвращает данные по коду, если он действителен"""
+        codes = self._load_codes()
         
-        Args:
-            code: Код для проверки
-            
-        Returns:
-            Данные кода если действителен, иначе None
-        """
-        if code not in self.codes:
-            logger.warning(f"⚠️ Код не найден: {code}")
-            return None
+        # Очищаем старые коды
+        codes = self._cleanup_expired(codes)
+        self._save_codes(codes)
         
-        code_data = self.codes[code]
+        if code in codes:
+            data = codes[code]
+            return data
         
-        # Проверяем истечение
-        if datetime.now() > code_data['expires_at']:
-            logger.warning(f"⚠️ Код истек: {code}")
-            del self.codes[code]
-            return None
-        
-        logger.info(f"✅ Код найден и действителен: {code}")
-        return code_data
-    
-    def remove_code(self, code: str) -> bool:
-        """
-        Удалить использованный код
-        
-        Args:
-            code: Код для удаления
-            
-        Returns:
-            True если код был удален, False если не найден
-        """
-        if code in self.codes:
-            del self.codes[code]
-            logger.info(f"🗑️ Код удален: {code}")
-            return True
-        
-        logger.warning(f"⚠️ Код для удаления не найден: {code}")
-        return False
-    
-    def cleanup_expired(self) -> int:
-        """
-        Очистить истекшие коды (можно запускать периодически)
-        
-        Returns:
-            Количество удаленных кодов
-        """
-        expired_codes = [
-            code for code, data in self.codes.items()
-            if datetime.now() > data['expires_at']
-        ]
-        
-        for code in expired_codes:
-            del self.codes[code]
-        
-        if expired_codes:
-            logger.info(f"🧹 Очищено истекших кодов: {len(expired_codes)}")
-        
-        return len(expired_codes)
-    
-    def get_stats(self) -> Dict[str, int]:
-        """Получить статистику активных кодов"""
-        return {
-            'total_codes': len(self.codes),
-            'valid_codes': len([
-                code for code, data in self.codes.items()
-                if datetime.now() <= data['expires_at']
-            ])
-        }
+        logger.warning(f"❌ Код '{code}' не найден или истек")
+        return None
 
+    def remove_code(self, code: str):
+        """Удаляет код связки"""
+        codes = self._load_codes()
+        
+        if code in codes:
+            del codes[code]
+            self._save_codes(codes)
+            logger.info(f"🗑️ Код связки '{code}' удален.")
 
-# Глобальный экземпляр сервиса
+    def find_code_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """Находит код связки по Telegram ID пользователя"""
+        codes = self._load_codes()
+        
+        # Очищаем старые коды
+        codes = self._cleanup_expired(codes)
+        
+        for code, data in codes.items():
+            if data['telegram_id'] == telegram_id:
+                return data
+        
+        logger.warning(f"❌ Код связки для Telegram ID {telegram_id} не найден или истек")
+        return None
+
 telegram_linking_service = TelegramLinkingService()
