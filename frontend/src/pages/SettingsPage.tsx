@@ -325,7 +325,7 @@ const SettingsPage: React.FC = () => {
               <div className="flex items-center gap-4">
                 <img src={filtersIcon} alt="Filters" className="w-8 h-8" />
                 <h2 className="font-semibold text-[22px] text-gray-900">
-                  My filters
+                  Notifications
                 </h2>
               </div>
               <img
@@ -655,143 +655,143 @@ const SettingsPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
 
-                {/* Subscriptions Section */}
-                <div className="border-t border-gray-200 pt-6">
-                  <button
-                    onClick={() =>
-                      setSubscriptionsExpanded(!subscriptionsExpanded)
-                    }
-                    className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
-                  >
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={subscriptionIcon}
-                        alt="Subscriptions"
-                        className="w-8 h-8"
-                      />
-                      <h2 className="font-semibold text-[22px] text-gray-900">
-                        Subscriptions
-                      </h2>
-                    </div>
-                    <img
-                      src={arrowDownIcon}
-                      alt="Toggle"
-                      className={`w-8 h-8 transition-transform ${subscriptionsExpanded ? "rotate-180" : "rotate-90"}`}
-                    />
-                  </button>
+          {/* Subscriptions Section */}
+          <div className="bg-white rounded-xl shadow-md mb-4">
+            <button
+              onClick={() =>
+                setSubscriptionsExpanded(!subscriptionsExpanded)
+              }
+              className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
+            >
+              <div className="flex items-center gap-4">
+                <img
+                  src={subscriptionIcon}
+                  alt="Subscriptions"
+                  className="w-8 h-8"
+                />
+                <h2 className="font-semibold text-[22px] text-gray-900">
+                  Subscriptions
+                </h2>
+              </div>
+              <img
+                src={arrowDownIcon}
+                alt="Toggle"
+                className={`w-8 h-8 transition-transform ${subscriptionsExpanded ? "rotate-180" : "rotate-90"}`}
+              />
+            </button>
 
-                  {subscriptionsExpanded && (
-                    <div className="p-6 pt-0 border-t border-gray-200">
-                      {/* Current Active Subscription */}
-                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
-                        <h3 className="font-semibold text-[18px] text-gray-900 mb-3">
-                          🔔 Your Active Subscription
-                        </h3>
-                        <div className="space-y-2 text-[14px] text-gray-700">
-                          <p>
-                            <span className="font-semibold">📍 City:</span>{" "}
-                            {currentFilter.city || "Rome"}
-                          </p>
-                          {(currentFilter.property_type || []).length > 0 && (
-                            <p>
-                              <span className="font-semibold">
-                                🏠 Property Type:
-                              </span>{" "}
-                              {currentFilter.property_type?.join(", ")}
-                            </p>
-                          )}
-                          {(currentFilter.rooms || []).length > 0 && (
-                            <p>
-                              <span className="font-semibold">🚪 Rooms:</span>{" "}
-                              {currentFilter.rooms?.join(", ")}
-                            </p>
-                          )}
-                          {(currentFilter.price_min ||
-                            currentFilter.price_max) && (
-                            <p>
-                              <span className="font-semibold">💰 Price:</span> €
-                              {currentFilter.price_min || "any"} - €
-                              {currentFilter.price_max || "any"}
-                            </p>
-                          )}
-                          {(currentFilter.min_area ||
-                            currentFilter.max_area) && (
-                            <p>
-                              <span className="font-semibold">📐 Area:</span>{" "}
-                              {currentFilter.min_area || "any"}m² -{" "}
-                              {currentFilter.max_area || "any"}m²
-                            </p>
-                          )}
-                          {currentFilter.no_commission && (
-                            <p>
-                              <span className="font-semibold">
-                                ✓ No commission
-                              </span>
-                            </p>
-                          )}
-                          {currentFilter.pets_allowed && (
-                            <p>
-                              <span className="font-semibold">
-                                ✓ Pets allowed
-                              </span>
-                            </p>
-                          )}
-                          {currentFilter.children_allowed && (
-                            <p>
-                              <span className="font-semibold">
-                                ✓ Children allowed
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                        <p className="text-[12px] text-gray-600 mt-3 italic">
-                          📧 You will receive email notifications when new
-                          apartments matching these criteria are posted
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Payment Section */}
-                <div className="bg-white rounded-xl shadow-md mb-4">
-                  <button
-                    onClick={() => setPaymentExpanded(!paymentExpanded)}
-                    className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
-                  >
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={paymentIcon}
-                        alt="Payment"
-                        className="w-8 h-8"
-                      />
-                      <h2 className="font-semibold text-[22px] text-gray-900">
-                        Payment
-                      </h2>
-                    </div>
-                    <img
-                      src={arrowDownIcon}
-                      alt="Toggle"
-                      className={`w-8 h-8 transition-transform ${paymentExpanded ? "rotate-180" : "rotate-90"}`}
-                    />
-                  </button>
-                </div>
-
-                {/* Log Out Section */}
-                <div className="bg-white rounded-xl shadow-md">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full p-6 flex items-center gap-4 hover:bg-red-50 transition rounded-xl"
-                  >
-                    <img src={logoutIcon} alt="Log out" className="w-8 h-8" />
-                    <h2 className="font-semibold text-[22px] text-red-500">
-                      Log out
-                    </h2>
-                  </button>
+            {subscriptionsExpanded && (
+              <div className="p-6 pt-0 border-t border-gray-200">
+                {/* Current Active Subscription */}
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
+                  <h3 className="font-semibold text-[18px] text-gray-900 mb-3">
+                    🔔 Your Active Subscription
+                  </h3>
+                  <div className="space-y-2 text-[14px] text-gray-700">
+                    <p>
+                      <span className="font-semibold">📍 City:</span>{" "}
+                      {currentFilter.city || "Rome"}
+                    </p>
+                    {(currentFilter.property_type || []).length > 0 && (
+                      <p>
+                        <span className="font-semibold">
+                          🏠 Property Type:
+                        </span>{" "}
+                        {currentFilter.property_type?.join(", ")}
+                      </p>
+                    )}
+                    {(currentFilter.rooms || []).length > 0 && (
+                      <p>
+                        <span className="font-semibold">🚪 Rooms:</span>{" "}
+                        {currentFilter.rooms?.join(", ")}
+                      </p>
+                    )}
+                    {(currentFilter.price_min ||
+                      currentFilter.price_max) && (
+                      <p>
+                        <span className="font-semibold">💰 Price:</span> €
+                        {currentFilter.price_min || "any"} - €
+                        {currentFilter.price_max || "any"}
+                      </p>
+                    )}
+                    {(currentFilter.min_area ||
+                      currentFilter.max_area) && (
+                      <p>
+                        <span className="font-semibold">📐 Area:</span>{" "}
+                        {currentFilter.min_area || "any"}m² -{" "}
+                        {currentFilter.max_area || "any"}m²
+                      </p>
+                    )}
+                    {currentFilter.no_commission && (
+                      <p>
+                        <span className="font-semibold">
+                          ✓ No commission
+                        </span>
+                      </p>
+                    )}
+                    {currentFilter.pets_allowed && (
+                      <p>
+                        <span className="font-semibold">
+                          ✓ Pets allowed
+                        </span>
+                      </p>
+                    )}
+                    {currentFilter.children_allowed && (
+                      <p>
+                        <span className="font-semibold">
+                          ✓ Children allowed
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-gray-600 mt-3 italic">
+                    📧 You will receive email notifications when new
+                    apartments matching these criteria are posted
+                  </p>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Payment Section */}
+          <div className="bg-white rounded-xl shadow-md mb-4">
+            <button
+              onClick={() => setPaymentExpanded(!paymentExpanded)}
+              className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
+            >
+              <div className="flex items-center gap-4">
+                <img
+                  src={paymentIcon}
+                  alt="Payment"
+                  className="w-8 h-8"
+                />
+                <h2 className="font-semibold text-[22px] text-gray-900">
+                  Payment
+                </h2>
+              </div>
+              <img
+                src={arrowDownIcon}
+                alt="Toggle"
+                className={`w-8 h-8 transition-transform ${paymentExpanded ? "rotate-180" : "rotate-90"}`}
+              />
+            </button>
+          </div>
+
+          {/* Log Out Section */}
+          <div className="bg-white rounded-xl shadow-md">
+            <button
+              onClick={handleLogout}
+              className="w-full p-6 flex items-center gap-4 hover:bg-red-50 transition rounded-xl"
+            >
+              <img src={logoutIcon} alt="Log out" className="w-8 h-8" />
+              <h2 className="font-semibold text-[22px] text-red-500">
+                Log out
+              </h2>
+            </button>
           </div>
         </div>
       </main>
