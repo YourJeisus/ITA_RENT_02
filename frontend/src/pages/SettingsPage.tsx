@@ -659,7 +659,9 @@ const SettingsPage: React.FC = () => {
                 {/* Subscriptions Section */}
                 <div className="border-t border-gray-200 pt-6">
                   <button
-                    onClick={() => setSubscriptionsExpanded(!subscriptionsExpanded)}
+                    onClick={() =>
+                      setSubscriptionsExpanded(!subscriptionsExpanded)
+                    }
                     className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
                   >
                     <div className="flex items-center gap-4">
@@ -681,6 +683,63 @@ const SettingsPage: React.FC = () => {
 
                   {subscriptionsExpanded && (
                     <div className="p-6 pt-0 border-t border-gray-200">
+                      {/* Current Active Subscription */}
+                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
+                        <h3 className="font-semibold text-[18px] text-gray-900 mb-3">
+                          🔔 Your Active Subscription
+                        </h3>
+                        <div className="space-y-2 text-[14px] text-gray-700">
+                          <p>
+                            <span className="font-semibold">📍 City:</span> {currentFilter.city || "Rome"}
+                          </p>
+                          {(currentFilter.property_type || []).length > 0 && (
+                            <p>
+                              <span className="font-semibold">🏠 Property Type:</span> {currentFilter.property_type?.join(", ")}
+                            </p>
+                          )}
+                          {(currentFilter.rooms || []).length > 0 && (
+                            <p>
+                              <span className="font-semibold">🚪 Rooms:</span> {currentFilter.rooms?.join(", ")}
+                            </p>
+                          )}
+                          {(currentFilter.price_min || currentFilter.price_max) && (
+                            <p>
+                              <span className="font-semibold">💰 Price:</span> €{currentFilter.price_min || "any"} - €{currentFilter.price_max || "any"}
+                            </p>
+                          )}
+                          {(currentFilter.min_area || currentFilter.max_area) && (
+                            <p>
+                              <span className="font-semibold">📐 Area:</span> {currentFilter.min_area || "any"}m² - {currentFilter.max_area || "any"}m²
+                            </p>
+                          )}
+                          {currentFilter.no_commission && (
+                            <p>
+                              <span className="font-semibold">✓ No commission</span>
+                            </p>
+                          )}
+                          {currentFilter.pets_allowed && (
+                            <p>
+                              <span className="font-semibold">✓ Pets allowed</span>
+                            </p>
+                          )}
+                          {currentFilter.children_allowed && (
+                            <p>
+                              <span className="font-semibold">✓ Children allowed</span>
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-[12px] text-gray-600 mt-3 italic">
+                          📧 You will receive email notifications when new apartments matching these criteria are posted
+                        </p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-gray-200 my-6 pt-6">
+                        <h3 className="font-semibold text-[18px] text-gray-900 mb-4">
+                          Modify Your Subscription
+                        </h3>
+                      </div>
+
                       {/* Search Settings */}
                       <div className="grid grid-cols-1 gap-6">
                         {/* City */}
@@ -720,23 +779,23 @@ const SettingsPage: React.FC = () => {
                             Property type
                           </label>
                           <div className="flex flex-wrap gap-2">
-                            {(["apartment", "room", "house"] as PropertyType[]).map(
-                              (type) => (
-                                <button
-                                  key={type}
-                                  onClick={() => handlePropertyTypeToggle(type)}
-                                  className={`px-4 py-2 rounded-lg text-[14px] font-medium transition ${
-                                    (currentFilter.property_type || []).includes(
-                                      type
-                                    )
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                  }`}
-                                >
-                                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                                </button>
-                              )
-                            )}
+                            {(
+                              ["apartment", "room", "house"] as PropertyType[]
+                            ).map((type) => (
+                              <button
+                                key={type}
+                                onClick={() => handlePropertyTypeToggle(type)}
+                                className={`px-4 py-2 rounded-lg text-[14px] font-medium transition ${
+                                  (currentFilter.property_type || []).includes(
+                                    type
+                                  )
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                              >
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </button>
+                            ))}
                           </div>
                         </div>
 
@@ -931,7 +990,11 @@ const SettingsPage: React.FC = () => {
                     className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
                   >
                     <div className="flex items-center gap-4">
-                      <img src={paymentIcon} alt="Payment" className="w-8 h-8" />
+                      <img
+                        src={paymentIcon}
+                        alt="Payment"
+                        className="w-8 h-8"
+                      />
                       <h2 className="font-semibold text-[22px] text-gray-900">
                         Payment
                       </h2>
