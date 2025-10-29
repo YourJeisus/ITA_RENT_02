@@ -87,17 +87,8 @@ class Settings(BaseSettings):
     # Мониторинг
     SENTRY_DSN: str = ""
     
-    # Email
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
-    SMTP_PASSWORD: str = ""
-    
-    # Email API (Mailtrap, SendGrid, etc)
-    EMAIL_API_PROVIDER: str = "mailtrap"  # mailtrap, sendgrid, resend
-    MAILTRAP_API_TOKEN: str = ""
-    MAILTRAP_ACCOUNT_ID: str = ""
-    MAILTRAP_SENDER_EMAIL: str = "noreply@sandbox.mailtrap.io"
+    # Email (Resend API)
+    RESEND_API_TOKEN: str = ""
     
     # CORS - обновленные домены Railway + Vercel
     BACKEND_CORS_ORIGINS: List[str] = [

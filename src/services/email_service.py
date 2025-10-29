@@ -1,11 +1,11 @@
 """
 Email сервис для ITA_RENT_BOT
-Отправка уведомлений по электронной почте через Mailtrap Email API или SMTP
+Отправка уведомлений по электронной почте через Resend API
 """
 import logging
 import asyncio
 import requests
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from src.core.config import settings
@@ -14,25 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Сервис для отправки email уведомлений через Mailtrap API"""
+    """Сервис для отправки email уведомлений через Resend API"""
     
     def __init__(self):
-        self.provider = settings.EMAIL_API_PROVIDER
-        self.mailtrap_token = settings.MAILTRAP_API_TOKEN
-        self.mailtrap_account_id = settings.MAILTRAP_ACCOUNT_ID
-        self.sender_email = settings.MAILTRAP_SENDER_EMAIL
+        self.resend_token = settings.RESEND_API_TOKEN
         
-        # Проверка наличия необходимых настроек
-        if self.provider == "mailtrap":
-            if not all([self.mailtrap_token, self.mailtrap_account_id]):
-                logger.warning("⚠️ Mailtrap Email API настройки не полностью сконфигурированы.")
-                self.enabled = False
-            else:
-                self.enabled = True
-                logger.info(f"✅ Email сервис инициализирован: Mailtrap Email API")
-        else:
-            logger.warning(f"⚠️ Неизвестный email provider: {self.provider}")
+        if not self.resend_token:
+            logger.warning("⚠️ Resend API токен не сконфигурирован.")
             self.enabled = False
+        else:
+            self.enabled = True
+            logger.info("✅ Email сервис инициализирован: Resend API")
     
     def is_enabled(self) -> bool:
         """Проверка доступности email сервиса"""
@@ -46,7 +38,7 @@ class EmailService:
         html_body: Optional[str] = None
     ) -> bool:
         """
-        Отправка email сообщения через Mailtrap API
+        Отправка email сообщения через Resend API
         
         Args:
             to_email: Email получателя
@@ -62,9 +54,8 @@ class EmailService:
             return False
         
         try:
-            # Используем asyncio.to_thread для асинхронного выполнения синхронного кода
             result = await asyncio.to_thread(
-                self._send_via_mailtrap_api,
+                self._send_via_resend,
                 to_email,
                 subject,
                 body,
@@ -76,7 +67,7 @@ class EmailService:
             logger.error(f"❌ Ошибка отправки email на {to_email}: {e}")
             return False
     
-    def _send_via_mailtrap_api(
+    def _send_via_resend(
         self,
         to_email: str,
         subject: str,
@@ -84,48 +75,43 @@ class EmailService:
         html_body: Optional[str] = None
     ) -> bool:
         """
-        Отправка через Mailtrap API (синхронный метод)
+        Отправка через Resend API (синхронный метод)
         """
         try:
-            url = f"https://send.api.mailtrap.io/api/send"
+            url = "https://api.resend.com/emails"
+            
+            # Для MVP: отправляем на основной адрес (jablonskidar@gmail.com)
+            actual_to_email = "jablonskidar@gmail.com"
+            
+            logger.info(f"📧 Email: {to_email} → {actual_to_email} (тестовый режим)")
             
             # Подготавливаем payload
             payload = {
-                "from": {
-                    "email": self.sender_email,
-                    "name": "ITA Rent Bot"
-                },
-                "to": [
-                    {
-                        "email": to_email
-                    }
-                ],
-                "subject": subject,
+                "from": "onboarding@resend.dev",
+                "to": actual_to_email,
+                "subject": f"[{to_email}] {subject}",
                 "text": body,
-                "category": "notification"
             }
             
-            # Добавляем HTML если есть
             if html_body:
                 payload["html"] = html_body
             
-            # Отправляем запрос
             headers = {
-                "Authorization": f"Bearer {self.mailtrap_token}",
+                "Authorization": f"Bearer {self.resend_token}",
                 "Content-Type": "application/json"
             }
             
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             
             if response.status_code in [200, 201]:
-                logger.info(f"✅ Email успешно отправлен на {to_email}")
+                logger.info(f"✅ Email успешно отправлен на {actual_to_email}")
                 return True
             else:
-                logger.error(f"❌ Mailtrap API ошибка: {response.status_code} - {response.text}")
+                logger.error(f"❌ Resend ошибка {response.status_code}: {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Ошибка Mailtrap API для {to_email}: {e}")
+            logger.error(f"❌ Ошибка Resend: {e}")
             return False
     
     async def send_listing_notification_email(

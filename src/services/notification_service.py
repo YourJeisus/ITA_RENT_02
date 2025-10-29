@@ -460,8 +460,8 @@ class NotificationService:
                     else:
                         # Проверяем, не отправляли ли мы недавно email (защита от спама)
                         can_send_email = True
-                        if user.email_last_sent_at:
-                            # Минимум 1 час между email уведомлениями
+                        if user.email_last_sent_at and not settings.DEBUG_NOTIFICATIONS:
+                            # Минимум 1 час между email уведомлениями (только в production)
                             time_since_last = datetime.now(timezone.utc).replace(tzinfo=None) - user.email_last_sent_at
                             if time_since_last < timedelta(hours=1):
                                 can_send_email = False
