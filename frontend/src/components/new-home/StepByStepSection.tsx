@@ -4,7 +4,7 @@ import robotIcon from "../../designSvg/robot.svg";
 const StepByStepSection: React.FC = () => {
   return (
     <div className="bg-[#eaf4fd] py-[40px] md:py-[60px]">
-      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-[312px]">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-12 xl:px-24 2xl:px-[312px]">
         <h2 className="font-bold text-[32px] md:text-[48px] leading-[40px] md:leading-[56px] text-center text-gray-900 mb-[40px] md:mb-[60px]">
           Your apartment hunt – step by step
         </h2>

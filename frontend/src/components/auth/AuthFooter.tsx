@@ -10,7 +10,7 @@ import twitchIcon from '../../designSvg/twitch.svg';
 const AuthFooter: React.FC = () => {
   return (
     <footer className="bg-[#eaf4fd] border-t border-gray-200">
-      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-[40px] py-[40px] md:py-[80px]">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-12 xl:px-24 2xl:px-[40px] py-[40px] md:py-[80px]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-[80px] mb-[40px] md:mb-[80px]">
           {/* Newsletter Section - First on mobile */}
           <div className="order-1">
