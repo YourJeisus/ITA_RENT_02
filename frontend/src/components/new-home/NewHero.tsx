@@ -93,28 +93,26 @@ const NewHero: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#e0ecff] pt-[72px] pb-[68px]">
-      <div className="max-w-[1920px] mx-auto px-[312px]">
-        {/* Title */}
-        <h1 className="font-bold text-[48px] leading-[56px] text-center text-gray-900 mt-[94px] mb-[34px]">
-          Apartment search in Italy, 24/7
-        </h1>
+    <div className="bg-[#e0ecff] pt-[72px] pb-[80px] md:h-auto h-[900px] overflow-clip">
+      <div className="max-w-[1920px] mx-auto px-[40px] md:px-[312px] flex flex-col gap-[40px] items-center justify-center h-full">
+        {/* Title and Subtitle */}
+        <div className="flex flex-col gap-[24px] items-center text-center w-full shrink-0">
+          <h1 className="font-bold text-[48px] leading-[56px] text-gray-900 w-full">
+            Apartment search in Italy, 24/7
+          </h1>
+          <p className="font-medium text-[22px] leading-[32px] text-gray-600 w-full max-w-[856px]">
+            AI-powered assistant that finds apartments for you and sends them straight to your WhatsApp.
+          </p>
+        </div>
 
-        {/* Subtitle */}
-        <p className="font-medium text-[22px] leading-[32px] text-center text-gray-600 mb-[68px] max-w-[856px] mx-auto">
-          AI-powered assistant that finds apartments for you and sends them
-          straight
-          <br />
-          to your WhatsApp.
-        </p>
+        {/* Manual Search Section */}
+        <div className="flex flex-col gap-[12px] items-start w-full">
+          <p className="font-medium text-[18px] leading-[32px] text-blue-600 w-full">
+            Prefer to search manually?
+          </p>
 
-        {/* Manual Search Label */}
-        <p className="font-medium text-[18px] leading-[32px] text-blue-600 mb-[10px]">
-          Prefer to search manually?
-        </p>
-
-        {/* Search Bar */}
-        <div className="bg-white h-[64px] rounded-[12px] flex items-center px-[24px] mb-[28px]">
+          {/* Search Bar - Desktop */}
+          <div className="hidden md:flex bg-white h-[64px] rounded-[12px] items-center px-[24px] mb-[28px] w-full">
           {/* City */}
           <CityDropdown
             value={searchParams.city}
@@ -174,22 +172,99 @@ const NewHero: React.FC = () => {
               setSearchParams({ ...searchParams, neighborhood: e.target.value })
             }
           />
+          </div>
+
+          {/* Search Bar - Mobile */}
+        <div className="md:hidden bg-white rounded-[12px] p-[24px] relative flex flex-col gap-[24px] items-center w-full">
+          {/* First Row */}
+          <div className="flex h-[44px] items-center justify-between w-full">
+            <div className="basis-0 border-[0px_1px_0px_0px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center min-h-px min-w-px relative shrink-0">
+              <CityDropdown
+                value={searchParams.city}
+                onChange={(city) => setSearchParams({ ...searchParams, city })}
+              />
+            </div>
+            <div className="basis-0 flex gap-[12px] grow h-full items-center justify-center min-h-px min-w-px relative shrink-0">
+              <SimpleDropdown
+                value={searchParams.type}
+                options={["Short term rent", "Long term rent"]}
+                onChange={(type) => setSearchParams({ ...searchParams, type })}
+              />
+            </div>
+            <div className="basis-0 border-[0px_0px_0px_1px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center justify-end min-h-px min-w-px relative shrink-0">
+              <SimpleDropdown
+                value={searchParams.propertyType}
+                options={["Apartment", "House", "Studio", "Room", "Villa", "Loft"]}
+                onChange={(propertyType) =>
+                  setSearchParams({ ...searchParams, propertyType })
+                }
+              />
+            </div>
+          </div>
+
+          {/* Second Row */}
+          <div className="flex h-[44px] items-center justify-between w-full">
+            <div className="basis-0 border-[0px_1px_0px_0px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center min-h-px min-w-px relative shrink-0">
+              <RoomsDropdown
+                value={searchParams.rooms}
+                onChange={(rooms) => setSearchParams({ ...searchParams, rooms })}
+              />
+            </div>
+            <div className="basis-0 flex gap-[12px] grow h-full items-center justify-center min-h-px min-w-px relative shrink-0">
+              <PriceDropdown
+                value={searchParams.price}
+                onChange={(price) => setSearchParams({ ...searchParams, price })}
+              />
+            </div>
+            <div className="basis-0 border-[0px_0px_0px_1px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center justify-end min-h-px min-w-px relative shrink-0">
+              <FiltersDropdown value={filters} onChange={setFilters} />
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div className="flex gap-[10px] items-start w-full">
+            <div className="basis-0 bg-white border border-gray-200 border-solid flex gap-[12px] grow h-[44px] items-center min-h-px min-w-px px-[16px] py-[10px] relative rounded-[8px] shrink-0">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative shrink-0 size-[20px]">
+                <path d="M9 17C13.4183 17 17 13.4183 17 9C17 4.58172 13.4183 1 9 1C4.58172 1 1 4.58172 1 9C1 13.4183 4.58172 17 9 17Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M19 19L14.65 14.65" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Neighborhood, Metro"
+                className="font-normal text-[16px] leading-[24px] text-gray-400 text-nowrap whitespace-pre outline-none bg-transparent flex-1"
+                value={searchParams.neighborhood}
+                onChange={(e) =>
+                  setSearchParams({ ...searchParams, neighborhood: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          {/* Horizontal line separator */}
+          <div className="absolute h-0 left-[24px] top-[80px] w-full max-w-[512px]">
+            <div className="absolute bottom-0 left-0 right-0 top-[-1px] border-t border-slate-300"></div>
+          </div>
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center justify-end gap-[12px]">
+        <div className="flex gap-[40px] items-start w-full md:justify-end md:gap-[12px]">
           <button
             onClick={handleExploreMap}
-            className="border border-slate-300 border-solid px-[24px] py-[8px] rounded-[8px] font-semibold text-[16px] text-gray-900 leading-[24px] hover:bg-gray-50 transition-colors"
+            className="basis-0 border border-slate-300 border-solid flex gap-[10px] grow h-[44px] items-center justify-center min-h-px min-w-px px-[24px] py-[8px] relative rounded-[8px] shrink-0 md:flex-none md:h-auto"
           >
-            Explore on map
+            <p className="font-semibold text-[16px] leading-[24px] text-gray-900 text-nowrap whitespace-pre">
+              Explore on map
+            </p>
           </button>
           <button
             onClick={handleSearch}
-            className="bg-blue-600 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-white leading-[24px] hover:bg-blue-700 transition-colors"
+            className="basis-0 bg-blue-600 flex gap-[8px] grow h-[44px] items-center justify-center min-h-px min-w-px px-[24px] py-[10px] relative rounded-[8px] shrink-0 md:flex-none md:h-auto"
           >
-            Search
+            <p className="font-semibold text-[16px] leading-[24px] text-white text-nowrap whitespace-pre">
+              Search
+            </p>
           </button>
+        </div>
         </div>
       </div>
     </div>

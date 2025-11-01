@@ -41,27 +41,29 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-[12px] px-[16px] py-[10px] cursor-pointer hover:bg-gray-50 rounded-[8px] transition-colors"
+        className="flex items-center gap-[12px] cursor-pointer hover:opacity-80 transition-opacity w-full justify-center"
       >
-        <span className="font-normal text-[16px] text-gray-900 leading-[24px] whitespace-nowrap">
+        <span className="font-normal text-[16px] text-gray-900 leading-[24px] text-nowrap whitespace-pre">
           {value}
         </span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
-        >
-          <path
-            d="M4 6L8 10L12 6"
-            stroke="#111827"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <div className="relative shrink-0 size-[16px]">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+          >
+            <path
+              d="M4 6L8 10L12 6"
+              stroke="#111827"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
       </button>
 
       {/* Dropdown Menu */}

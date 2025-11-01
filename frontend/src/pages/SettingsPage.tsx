@@ -662,9 +662,7 @@ const SettingsPage: React.FC = () => {
           {/* Subscriptions Section */}
           <div className="bg-white rounded-xl shadow-md mb-4">
             <button
-              onClick={() =>
-                setSubscriptionsExpanded(!subscriptionsExpanded)
-              }
+              onClick={() => setSubscriptionsExpanded(!subscriptionsExpanded)}
               className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
             >
               <div className="flex items-center gap-4">
@@ -698,9 +696,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                     {(currentFilter.property_type || []).length > 0 && (
                       <p>
-                        <span className="font-semibold">
-                          🏠 Property Type:
-                        </span>{" "}
+                        <span className="font-semibold">🏠 Property Type:</span>{" "}
                         {currentFilter.property_type?.join(", ")}
                       </p>
                     )}
@@ -710,16 +706,14 @@ const SettingsPage: React.FC = () => {
                         {currentFilter.rooms?.join(", ")}
                       </p>
                     )}
-                    {(currentFilter.price_min ||
-                      currentFilter.price_max) && (
+                    {(currentFilter.price_min || currentFilter.price_max) && (
                       <p>
                         <span className="font-semibold">💰 Price:</span> €
                         {currentFilter.price_min || "any"} - €
                         {currentFilter.price_max || "any"}
                       </p>
                     )}
-                    {(currentFilter.min_area ||
-                      currentFilter.max_area) && (
+                    {(currentFilter.min_area || currentFilter.max_area) && (
                       <p>
                         <span className="font-semibold">📐 Area:</span>{" "}
                         {currentFilter.min_area || "any"}m² -{" "}
@@ -728,16 +722,12 @@ const SettingsPage: React.FC = () => {
                     )}
                     {currentFilter.no_commission && (
                       <p>
-                        <span className="font-semibold">
-                          ✓ No commission
-                        </span>
+                        <span className="font-semibold">✓ No commission</span>
                       </p>
                     )}
                     {currentFilter.pets_allowed && (
                       <p>
-                        <span className="font-semibold">
-                          ✓ Pets allowed
-                        </span>
+                        <span className="font-semibold">✓ Pets allowed</span>
                       </p>
                     )}
                     {currentFilter.children_allowed && (
@@ -749,8 +739,8 @@ const SettingsPage: React.FC = () => {
                     )}
                   </div>
                   <p className="text-[12px] text-gray-600 mt-3 italic">
-                    📧 You will receive email notifications when new
-                    apartments matching these criteria are posted
+                    📧 You will receive email notifications when new apartments
+                    matching these criteria are posted
                   </p>
                 </div>
               </div>
@@ -764,11 +754,7 @@ const SettingsPage: React.FC = () => {
               className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition rounded-xl"
             >
               <div className="flex items-center gap-4">
-                <img
-                  src={paymentIcon}
-                  alt="Payment"
-                  className="w-8 h-8"
-                />
+                <img src={paymentIcon} alt="Payment" className="w-8 h-8" />
                 <h2 className="font-semibold text-[22px] text-gray-900">
                   Payment
                 </h2>

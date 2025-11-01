@@ -10,14 +10,14 @@ import twitchIcon from '../../designSvg/twitch.svg';
 const AuthFooter: React.FC = () => {
   return (
     <footer className="bg-white border-t border-gray-200">
-      <div className="max-w-7xl mx-auto px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className="max-w-7xl mx-auto px-[40px] md:px-8 py-[80px] md:py-12">
+        <div className="flex flex-col md:grid md:grid-cols-3 gap-[80px] md:gap-12">
           {/* Logo and Social Icons */}
           <div>
             <Link to="/" className="font-extrabold text-[48px] text-blue-600 inline-block mb-6">
               RentAg
             </Link>
-            <div className="flex gap-4">
+            <div className="hidden md:flex gap-4">
               <a href="#" className="w-14 h-14 rounded-xl bg-[#e0ecff] flex items-center justify-center hover:bg-blue-100 transition">
                 <img src={instagramIcon} alt="Instagram" className="w-8 h-8" />
               </a>
@@ -28,7 +28,7 @@ const AuthFooter: React.FC = () => {
                 <img src={twitterIcon} alt="Twitter" className="w-8 h-8" />
               </a>
             </div>
-            <div className="flex gap-4 mt-4">
+            <div className="hidden md:flex gap-4 mt-4">
               <a href="#" className="w-14 h-14 rounded-xl bg-[#e0ecff] flex items-center justify-center hover:bg-blue-100 transition">
                 <img src={linkedinIcon} alt="LinkedIn" className="w-8 h-8" />
               </a>
@@ -42,8 +42,8 @@ const AuthFooter: React.FC = () => {
           </div>
 
           {/* Navigation Links */}
-          <div>
-            <nav className="flex flex-col gap-4">
+          <div className="flex items-center justify-between md:block">
+            <nav className="flex flex-col gap-[12px] md:gap-4 w-[163px] md:w-auto">
               <Link to="/search" className="font-medium text-[18px] text-gray-900 hover:text-blue-600 transition">
                 Search apartament
               </Link>
@@ -57,6 +57,46 @@ const AuthFooter: React.FC = () => {
                 FAQ
               </Link>
             </nav>
+            <div className="flex flex-row md:hidden flex-wrap gap-[24px] items-start w-[176px]">
+              <div className="content-start flex flex-wrap gap-[24px] items-start leading-[0] relative shrink-0 w-full">
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={instagramIcon} alt="Instagram" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={facebookIcon} alt="Facebook" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={twitterIcon} alt="Twitter" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={linkedinIcon} alt="LinkedIn" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={youtubeIcon} alt="YouTube" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+                <div className="grid-cols-[max-content] grid-rows-[max-content] inline-grid place-items-start relative shrink-0">
+                  <div className="[grid-area:1_/_1] bg-[#e0ecff] ml-0 mt-0 rounded-[8px] size-[40px]"></div>
+                  <div className="[grid-area:1_/_1] ml-[8.571px] mt-[8.571px] relative size-[22.857px]">
+                    <img src={twitchIcon} alt="Twitch" className="w-[22.857px] h-[22.857px]" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Newsletter */}
@@ -75,9 +115,19 @@ const AuthFooter: React.FC = () => {
           </div>
         </div>
 
+        {/* RentAg Logo - только на мобильных */}
+        <div className="h-[156.801px] relative shrink-0 w-full md:hidden flex items-center">
+          <Link to="/" className="font-extrabold text-[48px] text-blue-600 inline-block">
+            RentAg
+          </Link>
+        </div>
+
         {/* Copyright */}
-        <div className="border-t border-gray-200 mt-12 pt-6 text-center">
-          <p className="font-normal text-[16px] text-gray-600">
+        <div className="flex flex-col gap-[24px] items-center relative shrink-0 w-full">
+          <div className="h-0 relative shrink-0 w-full">
+            <div className="absolute bottom-0 left-0 right-0 top-[-1px] border-t border-gray-200"></div>
+          </div>
+          <p className="font-normal text-[16px] leading-[28px] text-center text-gray-600 w-full">
             © 2025 RentAg. All rights reserved.
           </p>
         </div>
