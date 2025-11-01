@@ -32,12 +32,7 @@ class TelegramBotService:
     
     def __init__(self):
         if not settings.TELEGRAM_BOT_TOKEN:
-            # В режиме разработки без токена просто логируем предупреждение
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning("TELEGRAM_BOT_TOKEN не настроен - Telegram бот будет недоступен")
-            self.bot = None
-            return
+            raise ValueError("TELEGRAM_BOT_TOKEN не настроен в конфигурации")
         
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.application = None
@@ -431,14 +426,7 @@ class TelegramBotService:
 
 
 # Глобальный экземпляр бота
-# Инициализация Telegram бота только если токен настроен
-try:
-    telegram_bot = TelegramBotService() if settings.TELEGRAM_BOT_TOKEN else None
-except Exception as e:
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"Не удалось инициализировать Telegram бота: {e}")
-    telegram_bot = None
+telegram_bot = TelegramBotService()
 
 
 async def send_notification_to_user(

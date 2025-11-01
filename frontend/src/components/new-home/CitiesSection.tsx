@@ -10,40 +10,51 @@ const CitiesSection: React.FC = () => {
     ['Genoa', 'Verona', 'Como', 'Cagliari', 'La Spezia'],
   ];
 
+  // Mobile cities - only 8 cities in 2 columns
+  const mobileCities = [
+    'Rome', 'Bologna', 'Messina', 'Amalfi',
+    'Rimini', 'Milan', 'Florence', 'Sorrento'
+  ];
+
   return (
-    <div className="bg-[#eaf4fd] py-[80px] md:py-[60px]">
-      <div className="max-w-[1920px] mx-auto px-[40px] md:px-[312px]">
-        <h2 className="font-bold text-[48px] leading-[56px] text-center text-gray-900 mb-[48px] md:mb-[60px]">
+    <div className="bg-[#eaf4fd] py-[40px] md:py-[60px]">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-[312px]">
+        <h2 className="font-bold text-[32px] md:text-[48px] leading-[40px] md:leading-[56px] text-center text-gray-900 mb-[40px] md:mb-[60px]">
           Where I search for apartments
         </h2>
 
-        <div className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[48px]">
-          <div className="flex flex-col gap-[48px] md:gap-0">
-            <div className="font-medium gap-[24px] grid grid-cols-[repeat(2,_minmax(0px,_1fr))] grid-rows-[repeat(4,_minmax(0px,_1fr))] h-[164px] leading-[32px] text-[18px] text-blue-600 text-center w-full md:flex md:flex-col md:space-y-[12px] md:h-auto">
-              {cities.flat().slice(0, 8).map((city, index) => {
-                const gridAreas = [
-                  '[grid-area:1_/_1]',
-                  '[grid-area:1_/_2]',
-                  '[grid-area:2_/_1]',
-                  '[grid-area:2_/_2]',
-                  '[grid-area:3_/_1]',
-                  '[grid-area:3_/_2]',
-                  '[grid-area:4_/_2]',
-                  '[grid-area:4_/_1]'
-                ];
-                return (
-                  <p
+        <div className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[24px] md:p-[48px]">
+          {/* Mobile view - 2 columns grid */}
+          <div className="lg:hidden grid grid-cols-2 gap-x-4 gap-y-6">
+            {mobileCities.map((city) => (
+              <button
+                key={city}
+                className="font-medium text-[16px] md:text-[18px] leading-[28px] md:leading-[32px] text-blue-600 hover:underline transition-all text-center"
+              >
+                {city}
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile "Load more" button */}
+          <button className="lg:hidden w-full mt-8 border border-slate-300 border-solid px-[24px] py-[8px] rounded-[8px] font-semibold text-[16px] text-gray-900 leading-[24px] hover:bg-gray-50 transition-colors">
+            Load more
+          </button>
+
+          {/* Desktop view - rows of 5 */}
+          <div className="hidden lg:block space-y-[12px]">
+            {cities.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex justify-between">
+                {row.map((city) => (
+                  <button
                     key={city}
-                    className={`font-medium text-[18px] leading-[32px] text-blue-600 text-center relative self-start ${gridAreas[index]} md:static md:w-[196px]`}
+                    className="font-medium text-[18px] leading-[32px] text-blue-600 hover:underline transition-all w-[196px] text-center"
                   >
                     {city}
-                  </p>
-                );
-              })}
-            </div>
-            <button className="border border-slate-300 border-solid px-[24px] py-[8px] rounded-[8px] font-semibold text-[16px] text-gray-900 leading-[24px] hover:bg-gray-50 transition-colors h-[44px] w-full md:w-auto md:mt-0">
-              Load more
-            </button>
+                  </button>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
       </div>

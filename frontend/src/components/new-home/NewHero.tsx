@@ -93,26 +93,25 @@ const NewHero: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#e0ecff] pt-[72px] pb-[80px] md:h-auto h-[900px] overflow-clip">
-      <div className="max-w-[1920px] mx-auto px-[40px] md:px-[312px] flex flex-col gap-[40px] items-center justify-center h-full">
-        {/* Title and Subtitle */}
-        <div className="flex flex-col gap-[24px] items-center text-center w-full shrink-0">
-          <h1 className="font-bold text-[48px] leading-[56px] text-gray-900 w-full">
-            Apartment search in Italy, 24/7
-          </h1>
-          <p className="font-medium text-[22px] leading-[32px] text-gray-600 w-full max-w-[856px]">
-            AI-powered assistant that finds apartments for you and sends them straight to your WhatsApp.
-          </p>
-        </div>
+    <div className="bg-[#e0ecff] pt-[72px] pb-[40px] md:pb-[68px]">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-[312px]">
+        {/* Title */}
+        <h1 className="font-bold text-[32px] md:text-[48px] leading-[40px] md:leading-[56px] text-center text-gray-900 mt-[40px] md:mt-[94px] mb-[24px] md:mb-[34px]">
+          Apartment search in Italy, 24/7
+        </h1>
 
-        {/* Manual Search Section */}
-        <div className="flex flex-col gap-[12px] items-start w-full">
-          <p className="font-medium text-[18px] leading-[32px] text-blue-600 w-full">
-            Prefer to search manually?
-          </p>
+        {/* Subtitle */}
+        <p className="font-medium text-[18px] md:text-[22px] leading-[28px] md:leading-[32px] text-center text-gray-600 mb-[40px] md:mb-[68px] max-w-[856px] mx-auto">
+          AI-powered assistant that finds apartments for you and sends them straight to your WhatsApp.
+        </p>
 
-          {/* Search Bar - Desktop */}
-          <div className="hidden md:flex bg-white h-[64px] rounded-[12px] items-center px-[24px] mb-[28px] w-full">
+        {/* Manual Search Label */}
+        <p className="font-medium text-[16px] md:text-[18px] leading-[28px] md:leading-[32px] text-blue-600 mb-[10px]">
+          Prefer to search manually?
+        </p>
+
+        {/* Search Bar - Desktop */}
+        <div className="hidden lg:flex bg-white h-[64px] rounded-[12px] items-center px-[24px] mb-[28px]">
           {/* City */}
           <CityDropdown
             value={searchParams.city}
@@ -172,66 +171,75 @@ const NewHero: React.FC = () => {
               setSearchParams({ ...searchParams, neighborhood: e.target.value })
             }
           />
-          </div>
+        </div>
 
-          {/* Search Bar - Mobile */}
-        <div className="md:hidden bg-white rounded-[12px] p-[24px] relative flex flex-col gap-[24px] items-center w-full">
-          {/* First Row */}
-          <div className="flex h-[44px] items-center justify-between w-full">
-            <div className="basis-0 border-[0px_1px_0px_0px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center min-h-px min-w-px relative shrink-0">
-              <CityDropdown
-                value={searchParams.city}
-                onChange={(city) => setSearchParams({ ...searchParams, city })}
-              />
+        {/* Search Bar - Mobile */}
+        <div className="lg:hidden bg-white rounded-[12px] p-[24px] mb-[24px] flex flex-col gap-[24px]">
+          <div className="flex flex-col gap-[12px]">
+            {/* Row 1 */}
+            <div className="grid grid-cols-3 h-[44px] items-center w-full gap-0">
+              <div className="flex gap-[12px] items-center h-full border-r border-slate-300">
+                <CityDropdown
+                  value={searchParams.city}
+                  onChange={(city) => setSearchParams({ ...searchParams, city })}
+                />
+              </div>
+              <div className="flex gap-[12px] items-center justify-center h-full">
+                <SimpleDropdown
+                  value={searchParams.type}
+                  options={["Rent", "Short term", "Long term"]}
+                  onChange={(type) => setSearchParams({ ...searchParams, type })}
+                />
+              </div>
+              <div className="flex gap-[12px] items-center justify-end h-full border-l border-slate-300">
+                <SimpleDropdown
+                  value={searchParams.propertyType}
+                  options={["Property type", "Apartment", "House", "Studio"]}
+                  onChange={(propertyType) =>
+                    setSearchParams({ ...searchParams, propertyType })
+                  }
+                />
+              </div>
             </div>
-            <div className="basis-0 flex gap-[12px] grow h-full items-center justify-center min-h-px min-w-px relative shrink-0">
-              <SimpleDropdown
-                value={searchParams.type}
-                options={["Short term rent", "Long term rent"]}
-                onChange={(type) => setSearchParams({ ...searchParams, type })}
-              />
-            </div>
-            <div className="basis-0 border-[0px_0px_0px_1px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center justify-end min-h-px min-w-px relative shrink-0">
-              <SimpleDropdown
-                value={searchParams.propertyType}
-                options={["Apartment", "House", "Studio", "Room", "Villa", "Loft"]}
-                onChange={(propertyType) =>
-                  setSearchParams({ ...searchParams, propertyType })
-                }
-              />
-            </div>
-          </div>
 
-          {/* Second Row */}
-          <div className="flex h-[44px] items-center justify-between w-full">
-            <div className="basis-0 border-[0px_1px_0px_0px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center min-h-px min-w-px relative shrink-0">
-              <RoomsDropdown
-                value={searchParams.rooms}
-                onChange={(rooms) => setSearchParams({ ...searchParams, rooms })}
-              />
-            </div>
-            <div className="basis-0 flex gap-[12px] grow h-full items-center justify-center min-h-px min-w-px relative shrink-0">
-              <PriceDropdown
-                value={searchParams.price}
-                onChange={(price) => setSearchParams({ ...searchParams, price })}
-              />
-            </div>
-            <div className="basis-0 border-[0px_0px_0px_1px] border-slate-300 border-solid flex gap-[12px] grow h-full items-center justify-end min-h-px min-w-px relative shrink-0">
-              <FiltersDropdown value={filters} onChange={setFilters} />
+            {/* Horizontal divider */}
+            <div className="w-full h-[1px] bg-slate-300" />
+
+            {/* Row 2 */}
+            <div className="grid grid-cols-3 h-[44px] items-center w-full gap-0">
+              <div className="flex gap-[12px] items-center h-full border-r border-slate-300">
+                <RoomsDropdown
+                  value={searchParams.rooms}
+                  onChange={(rooms) => setSearchParams({ ...searchParams, rooms })}
+                />
+              </div>
+              <div className="flex gap-[12px] items-center justify-center h-full">
+                <PriceDropdown
+                  value={searchParams.price}
+                  onChange={(price) => setSearchParams({ ...searchParams, price })}
+                />
+              </div>
+              <div className="flex gap-[12px] items-center justify-end h-full border-l border-slate-300">
+                <FiltersDropdown value={filters} onChange={setFilters} />
+              </div>
             </div>
           </div>
 
           {/* Search Input */}
           <div className="flex gap-[10px] items-start w-full">
-            <div className="basis-0 bg-white border border-gray-200 border-solid flex gap-[12px] grow h-[44px] items-center min-h-px min-w-px px-[16px] py-[10px] relative rounded-[8px] shrink-0">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative shrink-0 size-[20px]">
-                <path d="M9 17C13.4183 17 17 13.4183 17 9C17 4.58172 13.4183 1 9 1C4.58172 1 1 4.58172 1 9C1 13.4183 4.58172 17 9 17Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M19 19L14.65 14.65" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <div className="flex-1 bg-white border border-gray-200 rounded-[8px] px-[16px] py-[10px] h-[44px] flex gap-[12px] items-center">
+              <svg 
+                className="w-5 h-5 text-gray-400 shrink-0"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
                 placeholder="Neighborhood, Metro"
-                className="font-normal text-[16px] leading-[24px] text-gray-400 text-nowrap whitespace-pre outline-none bg-transparent flex-1"
+                className="flex-1 bg-transparent font-normal text-[16px] text-gray-900 leading-[24px] outline-none placeholder:text-gray-400"
                 value={searchParams.neighborhood}
                 onChange={(e) =>
                   setSearchParams({ ...searchParams, neighborhood: e.target.value })
@@ -239,32 +247,22 @@ const NewHero: React.FC = () => {
               />
             </div>
           </div>
-
-          {/* Horizontal line separator */}
-          <div className="absolute h-0 left-[24px] top-[80px] w-full max-w-[512px]">
-            <div className="absolute bottom-0 left-0 right-0 top-[-1px] border-t border-slate-300"></div>
-          </div>
         </div>
 
         {/* Buttons */}
-        <div className="flex gap-[40px] items-start w-full md:justify-end md:gap-[12px]">
+        <div className="flex flex-col md:flex-row items-center justify-end gap-[12px] md:gap-[12px]">
           <button
             onClick={handleExploreMap}
-            className="basis-0 border border-slate-300 border-solid flex gap-[10px] grow h-[44px] items-center justify-center min-h-px min-w-px px-[24px] py-[8px] relative rounded-[8px] shrink-0 md:flex-none md:h-auto"
+            className="w-full md:w-auto border border-slate-300 border-solid px-[24px] py-[8px] rounded-[8px] font-semibold text-[16px] text-gray-900 leading-[24px] hover:bg-gray-50 transition-colors"
           >
-            <p className="font-semibold text-[16px] leading-[24px] text-gray-900 text-nowrap whitespace-pre">
-              Explore on map
-            </p>
+            Explore on map
           </button>
           <button
             onClick={handleSearch}
-            className="basis-0 bg-blue-600 flex gap-[8px] grow h-[44px] items-center justify-center min-h-px min-w-px px-[24px] py-[10px] relative rounded-[8px] shrink-0 md:flex-none md:h-auto"
+            className="w-full md:w-auto bg-blue-600 px-[24px] py-[10px] rounded-[8px] font-semibold text-[16px] text-white leading-[24px] hover:bg-blue-700 transition-colors"
           >
-            <p className="font-semibold text-[16px] leading-[24px] text-white text-nowrap whitespace-pre">
-              Search
-            </p>
+            Search
           </button>
-        </div>
         </div>
       </div>
     </div>

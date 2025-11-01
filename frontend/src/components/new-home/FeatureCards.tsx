@@ -15,11 +15,9 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   description,
 }) => {
   return (
-    <div className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[24px] flex flex-col w-full md:w-[416px]">
+    <div className="bg-white min-h-[224px] w-full lg:w-[416px] rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[24px] flex flex-col">
       <div className="mb-[24px]">
-        <div className="bg-[#e0ecff] rounded-[12px] w-[56px] h-[56px] flex items-center justify-center">
-          <img src={icon} alt="" className="w-[32px] h-[32px]" />
-        </div>
+        <img src={icon} alt="" className="w-[56px] h-[56px]" />
       </div>
       <h3 className="font-semibold text-[22px] leading-[32px] text-gray-900 mb-[8px]">
         {title}
@@ -54,9 +52,9 @@ const FeatureCards: React.FC = () => {
   ];
 
   return (
-    <div className="bg-[#eaf4fd] py-[80px] md:py-[60px]">
-      <div className="max-w-[1920px] mx-auto px-[40px] md:px-[312px]">
-        <div className="flex flex-col md:flex-row gap-[10px] md:gap-[24px] md:justify-between">
+    <div className="bg-[#eaf4fd] py-[40px] md:py-[60px]">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-[312px]">
+        <div className="flex flex-col lg:flex-row gap-[16px] lg:gap-[24px] justify-between">
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} />
           ))}
