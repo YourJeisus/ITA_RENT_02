@@ -7,18 +7,18 @@ const getApiBaseUrl = (): string => {
     return import.meta.env.VITE_API_URL;
   }
 
-  // 2. Для локальной разработки
+  // 2. Для локальной разработки используем относительный путь (через proxy)
   if (import.meta.env.DEV || window.location.hostname === "localhost") {
-    return "http://localhost:8000";
+    return "/api/v1";
   }
 
   // 3. Для Railway - используем прямой URL к backend
   if (window.location.hostname.includes("railway.app")) {
-    return "https://itarent02back-production.up.railway.app";
+    return "https://itarent02back-production.up.railway.app/api/v1";
   }
 
   // 4. Fallback для других окружений
-  return "https://itarent02back-production.up.railway.app";
+  return "https://itarent02back-production.up.railway.app/api/v1";
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -32,7 +32,7 @@ console.log("🌍 Current environment:", {
 });
 
 const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`, // Добавляем префикс API
+  baseURL: API_BASE_URL, // Уже включает /api/v1
   headers: {
     "Content-Type": "application/json",
   },

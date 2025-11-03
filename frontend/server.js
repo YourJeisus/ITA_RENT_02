@@ -39,7 +39,12 @@ app.use((req, res, next) => {
 });
 
 // 🔴 ВАЖНО: Проксируем API запросы на backend ДО статических файлов!
-app.use("/api", (req, res) => {
+app.use("/api", (req, res, next) => {
+  // Пропускаем если это запрос к внешним сервисам через proxy
+  if (req.url.includes("images.") || req.url.includes("http")) {
+    return next();
+  }
+
   const backendUrl = "http://localhost:8000";
   // ВАЖНО: Добавляем /api перед путем потому что express.Router удаляет его
   const fullPath = `/api${req.url}`;
