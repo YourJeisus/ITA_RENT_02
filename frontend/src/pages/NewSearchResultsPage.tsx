@@ -384,7 +384,7 @@ const NewSearchResultsPage: React.FC = () => {
                     if (minPrice) params.append("min_price", minPrice);
                     if (maxPrice) params.append("max_price", maxPrice);
                     if (propertyType && propertyType !== "all") params.append("property_type", propertyType);
-                    window.location.href = `/#/map?${params.toString()}`;
+                    navigate(`/map?${params.toString()}`);
                   }}
                 >
                   View on map
