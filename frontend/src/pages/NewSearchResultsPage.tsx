@@ -375,12 +375,12 @@ const NewSearchResultsPage: React.FC = () => {
                   style={{ zIndex: 10000 }}
                   onClick={() => {
                     const params = new URLSearchParams();
-                    const city = searchParams.get("city");
+                    const city = searchParams.get("city") || "roma";
                     const minPrice = searchParams.get("min_price");
                     const maxPrice = searchParams.get("max_price");
                     const propertyType = searchParams.get("property_type");
                     
-                    if (city) params.append("city", city);
+                    params.append("city", city);
                     if (minPrice) params.append("min_price", minPrice);
                     if (maxPrice) params.append("max_price", maxPrice);
                     if (propertyType && propertyType !== "all") params.append("property_type", propertyType);
