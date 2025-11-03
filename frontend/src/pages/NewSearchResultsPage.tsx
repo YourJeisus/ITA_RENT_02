@@ -52,7 +52,7 @@ const NewSearchResultsPage: React.FC = () => {
     turin: { id: "Torino", name: "Turin", coords: [45.0703, 7.6869] },
     venice: { id: "Venezia", name: "Venice", coords: [45.4408, 12.3155] },
     bologna: { id: "Bologna", name: "Bologna", coords: [44.4949, 11.3426] },
-    // По умолчанию, если город уже на итальянском
+    // По умолчанию, если город уже на итальянским
     roma: { id: "Roma", name: "Rome", coords: [41.9028, 12.4964] },
     milano: { id: "Milano", name: "Milan", coords: [45.4642, 9.19] },
     firenze: { id: "Firenze", name: "Florence", coords: [43.7696, 11.2558] },
@@ -371,8 +371,16 @@ const NewSearchResultsPage: React.FC = () => {
               >
                 <button
                   type="button"
-                  className="pointer-events-auto flex items-center justify-center bg-white border border-gray-200 px-[24px] py-[8px] rounded-[8px] shadow-[0px_4px_12px_rgba(0,0,0,0.04)] text-[16px] font-semibold text-gray-900"
+                  className="pointer-events-auto flex items-center justify-center bg-white border border-gray-200 px-[24px] py-[8px] rounded-[8px] shadow-[0px_4px_12px_rgba(0,0,0,0.04)] text-[16px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
                   style={{ zIndex: 10000 }}
+                  onClick={() => {
+                    const params = new URLSearchParams();
+                    if (filters.city?.id) params.append("city", filters.city.id);
+                    if (filters.priceMin) params.append("min_price", filters.priceMin.toString());
+                    if (filters.priceMax) params.append("max_price", filters.priceMax.toString());
+                    if (filters.propertyType && filters.propertyType !== "all") params.append("property_type", filters.propertyType);
+                    window.location.href = `/#/map?${params.toString()}`;
+                  }}
                 >
                   View on map
                 </button>
