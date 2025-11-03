@@ -20,6 +20,6 @@ if __name__ == "__main__":
     import asyncio
     
     print("🚀 Запуск парсинга ВСЕХ источников через Railway Cron...")
-    print("📊 Источники: Immobiliare.it + Subito.it + Idealista.it")
+    print("📊 Источники: Immobiliare.it + Subito.it + Idealista.it + Casa.it")
     print("⏰ Расписание: каждые 2 часа")
     asyncio.run(main()) 

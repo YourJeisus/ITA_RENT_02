@@ -1,643 +1,434 @@
 #!/usr/bin/env python3
 """
-🚀 АСИНХРОННЫЙ СКРАПЕР ДЛЯ SUBITO.IT V1
-Создан на основе архитектуры ImmobiliareScraper
-
-Основные принципы:
-✅ Правильная реализация ScraperAPI Async API
-✅ Job submission -> Status polling -> Result extraction
-✅ Правильная дедупликация по external_id
-✅ Обработка разных страниц с разными объявлениями
-✅ Fallback на обычный API при проблемах
-✅ Геокодирование через OpenStreetMap
+🚀 ПАРАЛЛЕЛЬНЫЙ ПАРСЕР SUBITO.IT
+Парсинг через __NEXT_DATA__ JSON (как Casa.it)
 """
 import asyncio
 import aiohttp
-import logging
+from bs4 import BeautifulSoup
+from src.core.config import settings
 import json
 import re
-import time
-from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs
-from ..core.config import settings
-
-logger = logging.getLogger(__name__)
-
+from typing import List, Dict, Any, Optional
+from urllib.parse import urljoin
 
 class SubitoScraper:
-    """
-    Асинхронный скрапер для Subito.it
-    Основан на архитектуре ImmobiliareScraper
-    """
+    """Быстрый парсер Subito через JSON"""
     
-    def __init__(self, enable_geocoding: bool = True):
-        self.name = "Subito.it Async Scraper V1"
+    def __init__(self, enable_geocoding: bool = False, fetch_coords: bool = False):
         self.base_url = "https://www.subito.it"
         self.search_url = "https://www.subito.it/annunci-lazio/affitto/immobili/roma/roma/"
-        self.enable_geocoding = enable_geocoding
+        self.api_url = "https://api.scraperapi.com/"
+        self.api_key = settings.SCRAPERAPI_KEY
+        self.enable_geocoding = enable_geocoding  # Для совместимости с интерфейсом
+        self.fetch_coords = fetch_coords  # Парсить координаты с детальных страниц
         
-        # ScraperAPI endpoints
-        self.async_jobs_url = "https://async.scraperapi.com/jobs"
-        self.sync_api_url = "https://api.scraperapi.com"
-        
-        # Настройки таймаутов
-        self.job_submit_timeout = 30
-        self.job_poll_timeout = 300  # 5 минут максимум
-        self.sync_request_timeout = 70  # Рекомендуется в документации
-        
-        # Кеш для дедупликации
-        self.seen_listing_ids: Set[str] = set()
-    
-    def build_page_url(self, page: int) -> str:
-        """Строит URL для конкретной страницы"""
-        if page <= 1:
-            return self.search_url
-        return f"{self.search_url}?o={page}"
-    
-    async def submit_async_job(self, url: str, page_num: int) -> Optional[Dict[str, Any]]:
-        """
-        Отправляет задачу в ScraperAPI Async Jobs API
-        """
-        if not settings.SCRAPERAPI_KEY:
-            logger.error("❌ SCRAPERAPI_KEY не установлен")
-            return None
-        
-        payload = {
-            "apiKey": settings.SCRAPERAPI_KEY,
-            "url": url,
-            "render": False,  # Не используем JS рендеринг
-            "premium": False,  # Базовые прокси
-            "country_code": "it",
-            "device_type": "desktop"
+        self.stats = {
+            'success': 0,
+            'failed': 0,
+            'with_coords': 0,
+            'with_images': 0,
         }
-        
-        headers = {
-            "Content-Type": "application/json"
+    
+    async def fetch_html(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
+        """Получает HTML через ScraperAPI (простой запрос)"""
+        params = {
+            'api_key': self.api_key,
+            'url': url
         }
-        
-        timeout = aiohttp.ClientTimeout(total=self.job_submit_timeout)
         
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    self.async_jobs_url,
-                    json=payload,
-                    headers=headers
-                ) as response:
-                    
-                    response_text = await response.text()
-                    
-                    if response.status == 200:
-                        try:
-                            job_data = json.loads(response_text)
-                            job_id = job_data.get("id")
-                            status = job_data.get("status")
-                            status_url = job_data.get("statusUrl")
-                            
-                            logger.debug(f"📤 Job {job_id} создан для страницы {page_num}")
-                            return {
-                                "id": job_id,
-                                "status": status,
-                                "statusUrl": status_url,
-                                "page_num": page_num,
-                                "url": url
-                            }
-                        except json.JSONDecodeError as e:
-                            logger.error(f"❌ Ошибка парсинга JSON ответа: {e}")
-                            return None
-                    else:
-                        logger.error(f"❌ HTTP ошибка {response.status} для страницы {page_num}")
-                        return None
-                        
+            timeout = aiohttp.ClientTimeout(total=90)
+            async with session.get(self.api_url, params=params, timeout=timeout) as response:
+                if response.status == 200:
+                    return await response.text()
+                return None
         except Exception as e:
-            logger.error(f"❌ Исключение при создании job для страницы {page_num}: {e}")
+            print(f"    ❌ Ошибка: {e}")
             return None
     
-    async def poll_job_status(self, job_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Опрашивает статус задачи до завершения
-        """
-        job_id = job_data.get("id")
-        status_url = job_data.get("statusUrl")
-        page_num = job_data.get("page_num")
-        
-        if not status_url:
-            logger.error(f"❌ Нет statusUrl для job {job_id}")
-            return None
-        
-        start_time = time.time()
-        poll_interval = 3  # Начинаем с 3 секунд
-        max_poll_interval = 15  # Максимум 15 секунд
-        
-        timeout = aiohttp.ClientTimeout(total=30)
-        
+    def extract_next_data(self, html: str) -> Optional[Dict[str, Any]]:
+        """Извлекает __NEXT_DATA__ из HTML"""
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                while time.time() - start_time < self.job_poll_timeout:
-                    elapsed = time.time() - start_time
+            soup = BeautifulSoup(html, 'html.parser')
+            script = soup.find('script', id='__NEXT_DATA__')
+            
+            if script and script.string:
+                return json.loads(script.string)
+            
+            return None
+        except Exception as e:
+            print(f"    ❌ Ошибка парсинга JSON: {e}")
+            return None
+    
+    def parse_listing_data(self, item_wrapper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Парсит одно объявление из JSON"""
+        try:
+            # item_wrapper имеет ключи: ['before', 'item', 'after', 'kind']
+            item = item_wrapper.get('item')
+            
+            if not item or not isinstance(item, dict):
+                return None
+            
+            # Основная информация
+            external_id = item.get('urn')
+            title = item.get('subject')
+            
+            if not external_id or not title:
+                return None
+            
+            # URL
+            url = item.get('urls', {}).get('default', '')
+            if not url.startswith('http'):
+                url = urljoin(self.base_url, url)
+            
+            # Features - это dict, а не list!
+            features_dict = item.get('features', {})
+            
+            # Цена (values[0] - это dict с ключами 'key' и 'value')
+            price = None
+            if '/price' in features_dict:
+                price_feature = features_dict['/price']
+                values = price_feature.get('values', [])
+                if values:
+                    value_dict = values[0]
+                    if isinstance(value_dict, dict):
+                        price_str = value_dict.get('key', '')  # key содержит число
+                    else:
+                        price_str = str(value_dict)
                     
                     try:
-                        async with session.get(status_url) as response:
-                            if response.status != 200:
-                                await asyncio.sleep(poll_interval)
-                                continue
-                            
-                            response_text = await response.text()
-                            
-                            try:
-                                job_status = json.loads(response_text)
-                            except json.JSONDecodeError:
-                                await asyncio.sleep(poll_interval)
-                                continue
-                            
-                            status = job_status.get("status")
-                            
-                            if status == "finished":
-                                logger.debug(f"✅ Job {job_id} (страница {page_num}) завершен за {elapsed:.1f}s")
-                                return job_status
-                            
-                            elif status == "failed":
-                                fail_reason = job_status.get("failReason", "unknown")
-                                logger.error(f"❌ Job {job_id} провалился: {fail_reason}")
-                                return None
-                            
-                            elif status in ["queued", "running"]:
-                                # Просто ждем без лишних логов
-                                await asyncio.sleep(poll_interval)
-                                # Постепенно увеличиваем интервал
-                                poll_interval = min(poll_interval * 1.2, max_poll_interval)
-                                continue
-                            
-                            else:
-                                logger.warning(f"⚠️ Неизвестный статус {status} для job {job_id}")
-                                await asyncio.sleep(poll_interval)
-                                continue
-                    
-                    except asyncio.TimeoutError:
-                        logger.warning(f"⚠️ Таймаут при опросе job {job_id}")
-                        await asyncio.sleep(poll_interval)
-                        continue
-                    
-                    except Exception as e:
-                        logger.warning(f"⚠️ Ошибка при опросе job {job_id}: {e}")
-                        await asyncio.sleep(poll_interval)
-                        continue
-                
-                # Превышен общий таймаут
-                logger.error(f"⏰ Превышено время ожидания для job {job_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"❌ Критическая ошибка при опросе job {job_id}: {e}")
-            return None
-    
-    async def scrape_page_sync_fallback(self, page_num: int) -> Optional[str]:
-        """
-        Fallback на обычный ScraperAPI при проблемах с Async API
-        """
-        url = self.build_page_url(page_num)
-        
-        params = {
-            "api_key": settings.SCRAPERAPI_KEY,
-            "url": url,
-            "render": "false",  # Без JS рендеринга
-        }
-        
-        timeout = aiohttp.ClientTimeout(total=self.sync_request_timeout)
-        
-        try:
-            logger.info(f"🔄 Fallback sync API для страницы {page_num}")
+                        price = int(price_str)
+                    except:
+                        pass
             
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(self.sync_api_url, params=params) as response:
-                    if response.status == 200:
-                        html_content = await response.text()
-                        
-                        # Проверяем, что получили валидный контент
-                        if len(html_content) > 5000 and "subito" in html_content.lower():
-                            logger.info(f"✅ Sync fallback успешен для страницы {page_num}")
-                            return html_content
-                        else:
-                            logger.warning(f"⚠️ Получен невалидный контент для страницы {page_num}")
-                            return None
+            # Характеристики недвижимости
+            rooms = None
+            if '/room' in features_dict:
+                room_values = features_dict['/room'].get('values', [])
+                if room_values:
+                    value_dict = room_values[0]
+                    if isinstance(value_dict, dict):
+                        room_str = value_dict.get('key', '')
                     else:
-                        logger.error(f"❌ Sync fallback HTTP {response.status} для страницы {page_num}")
-                        return None
-                        
-        except Exception as e:
-            logger.error(f"❌ Sync fallback исключение для страницы {page_num}: {e}")
-            return None
-    
-    async def scrape_single_page(self, page_num: int) -> List[Dict[str, Any]]:
-        """
-        Скрапит одну страницу через Async API с fallback
-        """
-        url = self.build_page_url(page_num)
-        
-        # Шаг 1: Попытка через Async API
-        job_data = await self.submit_async_job(url, page_num)
-        
-        html_content = None
-        
-        if job_data:
-            # Шаг 2: Ожидание завершения job
-            job_result = await self.poll_job_status(job_data)
+                        room_str = str(value_dict)
+                    
+                    try:
+                        rooms = int(re.search(r'\d+', room_str).group())
+                    except:
+                        pass
             
-            if job_result:
-                # Шаг 3: Извлечение HTML из результата
-                response_data = job_result.get("response", {})
-                html_content = response_data.get("body")
-                status_code = response_data.get("statusCode", 0)
-                
-                if html_content and status_code == 200:
-                    logger.info(f"✅ Async API успешен для страницы {page_num}")
-                else:
-                    logger.warning(f"⚠️ Проблема с Async API для страницы {page_num} (код: {status_code})")
-                    html_content = None
-        
-        # Fallback на sync API если async не сработал
-        if not html_content:
-            html_content = await self.scrape_page_sync_fallback(page_num)
-        
-        if not html_content:
-            logger.error(f"❌ Не удалось получить HTML для страницы {page_num}")
-            return []
-        
-        # Парсим HTML
-        return await self.parse_html_content(html_content, page_num)
-    
-    async def parse_html_content(self, html_content: str, page_num: int) -> List[Dict[str, Any]]:
-        """
-        Парсит HTML контент и извлекает объявления
-        """
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
+            area = None
+            if '/size' in features_dict:
+                size_values = features_dict['/size'].get('values', [])
+                if size_values:
+                    value_dict = size_values[0]
+                    if isinstance(value_dict, dict):
+                        size_str = value_dict.get('key', '')
+                    else:
+                        size_str = str(value_dict)
+                    
+                    try:
+                        area = int(re.search(r'\d+', size_str).group())
+                    except:
+                        pass
             
-            # Subito.it использует карточки объявлений с классом .item-card
-            listing_containers = soup.select('.item-card')
-            logger.debug(f"📋 Найдено {len(listing_containers)} объявлений с селектором .item-card")
+            floor = None
+            if '/floor' in features_dict:
+                floor_values = features_dict['/floor'].get('values', [])
+                if floor_values:
+                    value_dict = floor_values[0]
+                    if isinstance(value_dict, dict):
+                        floor = value_dict.get('value', '')
+                    else:
+                        floor = str(value_dict)
             
-            if not listing_containers:
-                logger.warning(f"⚠️ Не найдены объявления на странице {page_num}")
-                return []
+            # Тип недвижимости из категории
+            property_type = 'apartment'
+            category = item.get('category', {})
+            cat_name = category.get('friendlyName', '').lower()
             
-            # Парсим каждое объявление
-            page_listings = []
-            for container in listing_containers:
-                parsed_listing = await self.parse_single_listing_from_html(container)
-                if parsed_listing:
-                    # Проверяем дедупликацию
-                    listing_id = parsed_listing.get('external_id')
-                    if listing_id and listing_id not in self.seen_listing_ids:
-                        self.seen_listing_ids.add(listing_id)
-                        page_listings.append(parsed_listing)
+            if 'stanza' in cat_name or 'camera' in cat_name or 'posto-letto' in cat_name:
+                property_type = 'room'
+            elif 'monolocale' in cat_name:
+                property_type = 'studio'
+            elif 'villa' in cat_name or 'casa' in cat_name:
+                property_type = 'house'
+            elif 'appartamenti' in cat_name:
+                property_type = 'apartment'
             
-            logger.debug(f"✅ Страница {page_num}: {len(page_listings)}/{len(listing_containers)} уникальных")
-            return page_listings
+            # Геолокация
+            geo = item.get('geo', {})
+            map_data = geo.get('map', {})
             
-        except Exception as e:
-            logger.error(f"❌ Ошибка парсинга HTML страницы {page_num}: {e}")
-            return []
-    
-    async def parse_single_listing_from_html(self, container) -> Optional[Dict[str, Any]]:
-        """
-        Парсит одно объявление из HTML контейнера
-        """
-        try:
-            # Поиск ссылки на объявление (всегда первая ссылка в карточке)
-            link_elem = container.find('a', href=True)
-            if not link_elem:
-                return None
+            # В списках Subito не предоставляет координаты
+            latitude = map_data.get('lat') if map_data else None
+            longitude = map_data.get('lng') if map_data else None
+            address = map_data.get('address', '') if map_data else None
             
-            listing_url = link_elem.get('href')
-            if not listing_url:
-                return None
+            # Район
+            town = geo.get('town', {}).get('value', '')
             
-            # Делаем URL абсолютным
-            if listing_url.startswith('/'):
-                listing_url = urljoin(self.base_url, listing_url)
+            # Если нет адреса, берем название города
+            if not address:
+                city_value = geo.get('city', {}).get('value', '')
+                if city_value:
+                    address = city_value
             
-            # Извлекаем ID из URL
-            external_id = self._extract_id_from_url(listing_url)
-            if not external_id:
-                return None
+            # Изображения (в JSON только baseUrl, нужно дополнять)
+            images = []
+            gallery = item.get('images', [])
+            for img_item in gallery[:20]:  # Максимум 20
+                base_url = img_item.get('cdnBaseUrl') or img_item.get('url')
+                if base_url:
+                    # Для Subito нужно добавить параметры размера
+                    if 'sbito.it' in base_url:
+                        img_url = f"{base_url}?rule=width-300"
+                    else:
+                        img_url = base_url
+                    
+                    if img_url not in images:
+                        images.append(img_url)
             
-            # Заголовок (всегда в h2)
-            title_elem = container.select_one('h2')
-            title = title_elem.get_text(strip=True) if title_elem else None
-            if not title:
-                return None
+            # Описание
+            description = item.get('body', '')
             
-            # Цена (в элементе с классом содержащим "price")
-            price = self._extract_price_from_card(container)
-            
-            # Местоположение (в элементе с классом содержащим "location")
-            address = self._extract_location_from_card(container)
-            
-            # Изображения
-            images = self._extract_images_from_card(container)
-            
-            # Характеристики недвижимости из заголовка
-            rooms = self._extract_rooms_from_title(title)
-            area = self._extract_area_from_title(title)
-            
-            # Координаты
-            if self.enable_geocoding and address:
-                latitude, longitude = await self._geocode_address(address, "Roma, Italy")
-            else:
-                latitude, longitude = None, None
-            
-            # Тип недвижимости из URL и заголовка
-            property_type = self._normalize_property_type_from_url_and_title(listing_url, title)
+            # Дата публикации
+            published_at = item.get('date')
             
             return {
-                'external_id': external_id,
+                'external_id': f"subito_{external_id}",
                 'source': 'subito',
-                'url': listing_url,
+                'url': url,
                 'title': title,
-                'description': '',  # Subito не показывает описание в карточках
+                'description': description,
                 'price': price,
-                'price_currency': 'EUR',
                 'property_type': property_type,
                 'rooms': rooms,
-                'bathrooms': None,  # Subito обычно не указывает ванные отдельно
                 'area': area,
-                'floor': None,
-                'furnished': self._is_furnished_from_title(title),
-                'pets_allowed': None,
-                'features': [],
-                'address': address or 'Roma',
+                'floor': floor,
+                'bathrooms': None,  # Subito обычно не указывает
+                'latitude': float(latitude) if latitude else None,
+                'longitude': float(longitude) if longitude else None,
+                'address': address or town,
                 'city': 'Roma',
-                'district': None,
-                'postal_code': None,
-                'latitude': latitude,
-                'longitude': longitude,
+                'district': town,
                 'images': images,
-                'virtual_tour_url': None,
-                'agency_name': None,
-                'contact_info': None,
-                'is_active': True,
-                'published_at': None,
+                'published_at': published_at,
                 'scraped_at': datetime.utcnow().isoformat()
             }
             
         except Exception as e:
-            logger.error(f"❌ Ошибка парсинга объявления: {e}")
+            print(f"    ❌ Ошибка парсинга объявления: {e}")
             return None
     
-    async def scrape_multiple_pages(self, max_pages: int = 10) -> List[Dict[str, Any]]:
-        """
-        ОСНОВНОЙ МЕТОД: Скрапит несколько страниц асинхронно
-        """
-        logger.info(f"🚀 Запуск парсинга Subito.it: {max_pages} страниц...")
+    def parse_page(self, html: str) -> List[Dict[str, Any]]:
+        """Парсит страницу и извлекает все объявления"""
+        next_data = self.extract_next_data(html)
         
-        start_time = time.time()
-        
-        # Очищаем кеш дедупликации
-        self.seen_listing_ids.clear()
-        
-        # Создаем задачи для всех страниц с ограничением параллелизма
-        semaphore = asyncio.Semaphore(3)  # Максимум 3 параллельных запроса
-        
-        async def scrape_page_with_semaphore(page_num: int):
-            async with semaphore:
-                return await self.scrape_single_page(page_num)
-        
-        # Создаем задачи
-        tasks = []
-        for page_num in range(1, max_pages + 1):
-            task = scrape_page_with_semaphore(page_num)
-            tasks.append(task)
-        
-        logger.info(f"🔄 Запускаем {len(tasks)} задач с семафором...")
-        
-        # Выполняем все задачи параллельно
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Собираем результаты
-        all_listings = []
-        successful_pages = 0
-        error_pages = 0
-        
-        for page_num, result in enumerate(results, 1):
-            if isinstance(result, Exception):
-                logger.error(f"❌ Ошибка на странице {page_num}: {result}")
-                error_pages += 1
-            elif isinstance(result, list):
-                all_listings.extend(result)
-                if result:
-                    successful_pages += 1
-                else:
-                    logger.debug(f"🔚 Страница {page_num}: пустая")
-            else:
-                logger.warning(f"⚠️ Неожиданный результат для страницы {page_num}: {type(result)}")
-        
-        elapsed_time = time.time() - start_time
-        
-        logger.info(f"✅ Парсинг Subito.it завершен: {len(all_listings)} объявлений за {elapsed_time:.1f}с")
-        
-        return all_listings
-    
-    # Вспомогательные методы для парсинга
-    def _extract_id_from_url(self, url: str) -> Optional[str]:
-        """Извлекает ID объявления из URL"""
-        try:
-            # Subito.it использует формат: /category/title-ID.htm
-            # Пример: /appartamenti/appio-latino-bilocale-arredato-roma-610923878.htm
-            match = re.search(r'-(\d+)\.htm', url)
-            if match:
-                return match.group(1)
-            
-            return None
-        except Exception:
-            return None
-    
-    def _extract_price_from_card(self, container) -> Optional[float]:
-        """Извлекает цену из карточки Subito.it"""
-        try:
-            price_elem = container.select_one('[class*="price"]')
-            if price_elem:
-                price_text = price_elem.get_text(strip=True)
-                return self._parse_price_from_text(price_text)
-            return None
-        except Exception:
-            return None
-    
-    def _parse_price_from_text(self, price_text: str) -> Optional[float]:
-        """Парсит цену из текста"""
-        if not price_text:
-            return None
-        
-        # Убираем символы валюты и пробелы, заменяем запятые на точки
-        price_clean = re.sub(r'[€$\s]', '', price_text)
-        price_clean = price_clean.replace(',', '.')
-        match = re.search(r'(\d+(?:\.\d+)?)', price_clean)
-        
-        if match:
-            return float(match.group(1))
-        
-        return None
-    
-    def _extract_location_from_card(self, container) -> Optional[str]:
-        """Извлекает местоположение из карточки Subito.it"""
-        try:
-            location_elem = container.select_one('[class*="location"]')
-            if location_elem:
-                location_text = location_elem.get_text(strip=True)
-                # Извлекаем только город из текста вида "Roma(RM)Oggi alle 14:35"
-                match = re.search(r'([A-Za-z\s]+)', location_text)
-                if match:
-                    return match.group(1).strip()
-            return None
-        except Exception:
-            return None
-    
-    def _extract_images_from_card(self, container) -> List[str]:
-        """Извлекает изображения из карточки Subito.it"""
-        images = []
+        if not next_data:
+            return []
         
         try:
-            # Ищем img теги в карточке
-            img_elements = container.find_all('img')
-            for img in img_elements:
-                src = img.get('src') or img.get('data-src') or img.get('data-lazy')
-                if src and src.startswith('http') and 'camera.svg' not in src:
-                    if src not in images:
-                        images.append(src)
-        except Exception:
-            pass
-        
-        return images
-    
-    def _extract_rooms_from_title(self, title: str) -> Optional[int]:
-        """Извлекает количество комнат из заголовка"""
-        text = title.lower()
-        
-        # Итальянские термины для количества комнат
-        if 'monolocale' in text:
-            return 1
-        elif 'bilocale' in text:
-            return 2
-        elif 'trilocale' in text:
-            return 3
-        elif 'quadrilocale' in text:
-            return 4
-        elif 'cinque locali' in text or '5 locali' in text:
-            return 5
-        
-        # Ищем числа перед "комн", "stanze", "locali"
-        patterns = [
-            r'(\d+)\s*locali',
-            r'(\d+)\s*stanze',
-            r'(\d+)\s*комн',
-            r'(\d+)\s*room'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, text)
-            if match:
-                return int(match.group(1))
-        
-        return None
-    
-    def _extract_area_from_title(self, title: str) -> Optional[float]:
-        """Извлекает площадь из заголовка"""
-        # Ищем числа перед "м²", "mq", "metri"
-        patterns = [
-            r'(\d+)\s*m[²q2]',
-            r'(\d+)\s*metri\s*quadr',
-            r'(\d+)\s*sq'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, title.lower())
-            if match:
-                return float(match.group(1))
-        
-        return None
-    
-    def _normalize_property_type_from_url_and_title(self, url: str, title: str) -> str:
-        """Нормализует тип недвижимости из URL и заголовка"""
-        # Сначала проверяем URL на категорию
-        if '/appartamenti/' in url:
-            return 'apartment'
-        elif '/camere-posti-letto/' in url:
-            return 'room'
-        elif '/case-indipendenti/' in url:
-            return 'house'
-        elif '/attici-mansarde/' in url:
-            return 'penthouse'
-        elif '/uffici-locali-commerciali/' in url:
-            return 'commercial'  # коммерческая недвижимость
-        elif '/garage-e-box/' in url:
-            return 'garage'
-        
-        # Если URL не дал результата, анализируем заголовок
-        text = title.lower()
-        
-        if any(word in text for word in ['monolocale', 'studio']):
-            return 'studio'
-        elif any(word in text for word in ['villa', 'casa']):
-            return 'house'
-        elif any(word in text for word in ['stanza', 'camera', 'posto letto']):
-            return 'room'
-        elif any(word in text for word in ['attico', 'mansarda']):
-            return 'penthouse'
-        elif any(word in text for word in ['appartamento', 'bilocale', 'trilocale', 'quadrilocale']):
-            return 'apartment'
-        
-        return 'apartment'  # По умолчанию
-    
-    def _is_furnished_from_title(self, title: str) -> Optional[bool]:
-        """Определяет, меблированная ли недвижимость из заголовка"""
-        text = title.lower()
-        
-        if any(word in text for word in ['arredato', 'arredata', 'arredati', 'furnished']):
-            return True
-        elif any(word in text for word in ['non arredato', 'vuoto', 'unfurnished']):
-            return False
-        
-        return None
-    
-    async def _geocode_address(self, address: str, city: str) -> tuple[Optional[float], Optional[float]]:
-        """Геокодирование адреса через OpenStreetMap Nominatim API"""
-        try:
-            full_address = f"{address}, {city}"
-            url = "https://nominatim.openstreetmap.org/search"
+            items_list = next_data['props']['pageProps']['initialState']['items']['list']
             
-            params = {
-                'q': full_address,
-                'format': 'json',
-                'limit': 1,
-                'countrycodes': 'it',
-                'addressdetails': 1
-            }
-            
-            headers = {
-                'User-Agent': 'ITA_RENT_BOT/2.0 (rental search bot)'
-            }
-            
-            timeout = aiohttp.ClientTimeout(total=10)
-            
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if data and len(data) > 0:
-                            result = data[0]
-                            lat = float(result.get('lat', 0))
-                            lon = float(result.get('lon', 0))
-                            
-                            if 35.0 <= lat <= 47.0 and 6.0 <= lon <= 19.0:
-                                return lat, lon
-                        
-                    await asyncio.sleep(1)  # Уважаем лимиты API
+            listings = []
+            for item_wrapper in items_list:
+                listing = self.parse_listing_data(item_wrapper)
+                if listing:
+                    listings.append(listing)
                     
-            return None, None
+                    # Статистика
+                    if listing.get('latitude'):
+                        self.stats['with_coords'] += 1
+                    if listing.get('images'):
+                        self.stats['with_images'] += 1
+            
+            return listings
             
         except Exception as e:
-            logger.debug(f"Ошибка геокодирования для '{address}': {e}")
-            return None, None 
+            print(f"    ❌ Ошибка парсинга страницы: {e}")
+            return []
+    
+    def parse_detail_page_for_coords(self, html: str) -> Optional[tuple]:
+        """Извлекает координаты из детальной страницы"""
+        try:
+            next_data = self.extract_next_data(html)
+            if not next_data:
+                return None
+            
+            # Навигация: props.pageProps.ad.geo.map
+            ad_data = next_data.get('props', {}).get('pageProps', {}).get('ad', {})
+            geo = ad_data.get('geo', {})
+            map_data = geo.get('map', {})
+            
+            latitude = map_data.get('latitude')
+            longitude = map_data.get('longitude')
+            
+            if latitude and longitude:
+                return float(latitude), float(longitude)
+            
+            return None
+        except Exception as e:
+            return None
+    
+    async def scrape_multiple_pages(self, max_pages: int = 5):
+        """Основной метод с параллельным парсингом (совместимый интерфейс)"""
+        return await self.scrape_pages(num_pages=max_pages, fetch_coords=self.fetch_coords)
+    
+    async def scrape_pages(self, num_pages: int = 2, fetch_coords: bool = False, max_coords_fetch: int = 20, coords_concurrent: int = 10):
+        """Параллельный парсинг нескольких страниц"""
+        print("=" * 80)
+        print(f"🚀 ПАРАЛЛЕЛЬНЫЙ ПАРСИНГ SUBITO.IT")
+        print("=" * 80)
+        print(f"📄 Страниц списков: {num_pages}")
+        if fetch_coords:
+            print(f"🌍 Получение координат: до {max_coords_fetch} объявлений")
+            print(f"⚡ Параллельных запросов: {coords_concurrent}")
+        print("=" * 80)
+        
+        start_time = datetime.utcnow()
+        
+        async with aiohttp.ClientSession() as session:
+            # Генерируем URLs для страниц
+            page_urls = []
+            for page_num in range(1, num_pages + 1):
+                if page_num == 1:
+                    page_urls.append(self.search_url)
+                else:
+                    page_urls.append(f"{self.search_url}?o={page_num}")
+            
+            print(f"\n📋 Загрузка {len(page_urls)} страниц...")
+            print("-" * 80)
+            
+            # Параллельная загрузка
+            tasks = [self.fetch_html(session, url) for url in page_urls]
+            htmls = await asyncio.gather(*tasks)
+            
+            # Парсинг всех страниц
+            all_listings = []
+            for i, html in enumerate(htmls, 1):
+                if html:
+                    print(f"Страница {i}: {len(html)} символов")
+                    listings = self.parse_page(html)
+                    print(f"    ✅ Найдено {len(listings)} объявлений")
+                    all_listings.extend(listings)
+                    self.stats['success'] += 1
+                else:
+                    print(f"Страница {i}: ❌ не загружена")
+                    self.stats['failed'] += 1
+            
+            # ЭТАП 2: Получение координат с детальных страниц (если включено)
+            if fetch_coords and all_listings:
+                print("\n" + "=" * 80)
+                print(f"🌍 ЭТАП 2: Параллельное получение координат")
+                print("=" * 80)
+                
+                listings_to_fetch = all_listings[:max_coords_fetch]
+                print(f"📍 Обрабатываем {len(listings_to_fetch)} объявлений параллельно...")
+                
+                # Параллельная загрузка детальных страниц
+                semaphore = asyncio.Semaphore(coords_concurrent)
+                
+                async def fetch_and_parse_coords(listing, index):
+                    async with semaphore:
+                        detail_html = await self.fetch_html(session, listing['url'])
+                        
+                        if detail_html:
+                            coords = self.parse_detail_page_for_coords(detail_html)
+                            
+                            if coords:
+                                listing['latitude'], listing['longitude'] = coords
+                                self.stats['with_coords'] += 1
+                                print(f"[{index}/{len(listings_to_fetch)}] ✅ {listing['title'][:40]}... → {coords[0]:.6f}, {coords[1]:.6f}")
+                                return True
+                            else:
+                                print(f"[{index}/{len(listings_to_fetch)}] ⚠️ {listing['title'][:40]}... → координаты не найдены")
+                                return False
+                        else:
+                            print(f"[{index}/{len(listings_to_fetch)}] ❌ {listing['title'][:40]}... → не загружена")
+                            return False
+                
+                # Запускаем все задачи параллельно
+                tasks = [fetch_and_parse_coords(listing, i) for i, listing in enumerate(listings_to_fetch, 1)]
+                await asyncio.gather(*tasks)
+        
+        end_time = datetime.utcnow()
+        elapsed = (end_time - start_time).total_seconds()
+        
+        # ИТОГИ
+        print("\n" + "=" * 80)
+        print("📊 ИТОГОВАЯ СТАТИСТИКА")
+        print("=" * 80)
+        print(f"✅ Успешно загружено страниц: {self.stats['success']}")
+        print(f"❌ Ошибок загрузки: {self.stats['failed']}")
+        print(f"📦 Всего объявлений: {len(all_listings)}")
+        print()
+        print(f"📊 Качество данных:")
+        if all_listings:
+            print(f"   🌍 С координатами: {self.stats['with_coords']}/{len(all_listings)} ({self.stats['with_coords']/len(all_listings)*100:.0f}%)")
+            print(f"   🖼️  С изображениями: {self.stats['with_images']}/{len(all_listings)} ({self.stats['with_images']/len(all_listings)*100:.0f}%)")
+        
+        # Статистика других полей
+        if all_listings:
+            with_price = sum(1 for l in all_listings if l.get('price'))
+            with_rooms = sum(1 for l in all_listings if l.get('rooms'))
+            with_area = sum(1 for l in all_listings if l.get('area_sqm'))
+            with_description = sum(1 for l in all_listings if l.get('description'))
+            
+            print(f"   💰 С ценой: {with_price}/{len(all_listings)} ({with_price/len(all_listings)*100:.0f}%)")
+            print(f"   🚪 С комнатами: {with_rooms}/{len(all_listings)} ({with_rooms/len(all_listings)*100:.0f}%)")
+            print(f"   📐 С площадью: {with_area}/{len(all_listings)} ({with_area/len(all_listings)*100:.0f}%)")
+            print(f"   📝 С описанием: {with_description}/{len(all_listings)} ({with_description/len(all_listings)*100:.0f}%)")
+        print()
+        print(f"⏱️  Общее время: {elapsed:.1f} секунд")
+        if all_listings:
+            print(f"⚡ Скорость: {len(all_listings)/elapsed*60:.1f} объявлений/минуту")
+            print(f"📈 Среднее время: {elapsed/len(all_listings):.2f} сек/объявление")
+        
+        return all_listings
+
+
+async def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pages', type=int, default=2, help='Количество страниц списков')
+    parser.add_argument('--coords', action='store_true', help='Получить координаты с детальных страниц')
+    parser.add_argument('--max-coords', type=int, default=20, help='Максимум объявлений для получения координат')
+    parser.add_argument('--concurrent', type=int, default=10, help='Параллельных запросов для координат (default: 10)')
+    
+    args = parser.parse_args()
+    
+    scraper = SubitoParallelScraper()
+    listings = await scraper.scrape_pages(
+        num_pages=args.pages,
+        fetch_coords=args.coords,
+        max_coords_fetch=args.max_coords,
+        coords_concurrent=args.concurrent
+    )
+    
+    if listings:
+        output_file = '/tmp/subito_results.json'
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(listings, f, ensure_ascii=False, indent=2)
+        
+        print(f"\n💾 Результаты сохранены в {output_file}")
+        
+        # Пример объявления
+        print("\n📝 ПРИМЕР ОБЪЯВЛЕНИЯ:")
+        print("=" * 80)
+        first = listings[0]
+        for key, value in first.items():
+            if key == 'images':
+                print(f"   {key}: {len(value)} шт")
+            elif key == 'description' and len(str(value)) > 100:
+                print(f"   {key}: {str(value)[:100]}...")
+            else:
+                print(f"   {key}: {value}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+

@@ -5,16 +5,16 @@ import { listingsService } from "../services/listingsService";
 import styles from "./MapPage.module.scss";
 
 interface Listing {
-  id: number;
+  id: string;
   title: string;
-  price: string;
-  location_address: string;
+  price: number;
+  address_text: string;
   latitude?: number;
   longitude?: number;
-  url_details: string;
-  image_urls: string[];
-  area_sqm?: string;
-  rooms_count?: string;
+  url: string;
+  images: string[];
+  area_sqm?: number;
+  num_rooms?: number;
   source_site: string;
 }
 
@@ -31,46 +31,46 @@ const MapPage: React.FC = () => {
         setError(null);
 
         // Получаем параметры поиска из URL
-        const searchFilters = {
-          city: searchParams.get("city") || "roma",
-          min_price: searchParams.get("min_price")
-            ? parseInt(searchParams.get("min_price")!)
-            : undefined,
-          max_price: searchParams.get("max_price")
-            ? parseInt(searchParams.get("max_price")!)
-            : undefined,
-          min_area: searchParams.get("min_area")
-            ? parseInt(searchParams.get("min_area")!)
-            : undefined,
-          max_area: searchParams.get("max_area")
-            ? parseInt(searchParams.get("max_area")!)
-            : undefined,
-          rooms_count: searchParams.get("rooms_count")
-            ? parseInt(searchParams.get("rooms_count")!)
-            : undefined,
-          property_type: searchParams.get("property_type") || undefined,
-          source_site: searchParams.get("source_site") || undefined,
-        };
+        const city = searchParams.get("city") || "roma";
+        const minPrice = searchParams.get("min_price")
+          ? parseInt(searchParams.get("min_price")!)
+          : undefined;
+        const maxPrice = searchParams.get("max_price")
+          ? parseInt(searchParams.get("max_price")!)
+          : undefined;
+        const propertyType = searchParams.get("property_type") || undefined;
+        const sourceSite = searchParams.get("source_site") || undefined;
 
         console.log(
           "🗺️ Загрузка объявлений для карты с фильтрами:",
-          searchFilters
+          { city, minPrice, maxPrice, propertyType, sourceSite }
         );
 
-        // Используем поиск в базе данных
-        const response = await listingsService.searchListings({
-          ...searchFilters,
-          skip: 0,
-          limit: 1000,
-        });
+        // Используем новый эндпоинт для карты
+        const response = await fetch(
+          `/api/v1/listings/map?${new URLSearchParams({
+            ...(city && { city }),
+            ...(minPrice && { min_price: minPrice.toString() }),
+            ...(maxPrice && { max_price: maxPrice.toString() }),
+            ...(propertyType && { property_type: propertyType }),
+            ...(sourceSite && { source_site: sourceSite }),
+            limit: "500"
+          }).toString()}`
+        );
 
-        if (response.success) {
-          setListings(response.listings || []);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          setListings(data.listings || []);
           console.log(
-            `✅ Загружено ${response.listings?.length || 0} объявлений для карты из базы данных`
+            `✅ Загружено ${data.listings?.length || 0} объявлений для карты (${data.total} с координатами)`
           );
         } else {
-          throw new Error(response.error || "Ошибка загрузки данных");
+          throw new Error(data.error || "Ошибка загрузки данных");
         }
       } catch (err) {
         console.error("❌ Ошибка загрузки объявлений для карты:", err);

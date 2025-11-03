@@ -130,7 +130,7 @@ async def search_listings(
                 "limit": limit,
                 "has_more": total_count > skip + limit
             },
-            "listings": [
+            "results": [
                 {
                     "id": str(l.id),
                     "source_site": l.source,
@@ -177,6 +177,78 @@ async def search_listings(
             status_code=500,
             detail=f"Ошибка при поиске объявлений: {str(e)}"
         )
+
+
+@router.get("/map", response_model=dict)
+async def get_listings_for_map(
+    city: Optional[str] = Query(None, description="Город для поиска"),
+    min_price: Optional[float] = Query(None, description="Минимальная цена"),
+    max_price: Optional[float] = Query(None, description="Максимальная цена"),
+    property_type: Optional[str] = Query(None, description="Тип недвижимости"),
+    source_site: Optional[str] = Query(None, description="Источник (casa_it, subito, idealista, immobiliare)"),
+    limit: int = Query(500, ge=1, le=1000, description="Максимальное количество объявлений"),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить объявления с координатами для отображения на карте
+    Возвращает только объявления с координатами
+    """
+    try:
+        # Формируем фильтры
+        filters = {
+            "city": city or "Roma",
+            "min_price": min_price,
+            "max_price": max_price,
+            "property_type": property_type,
+            "source_site": source_site
+        }
+        
+        # Убираем None значения
+        filters = {k: v for k, v in filters.items() if v is not None}
+        
+        # Получаем объявления с координатами
+        listings_data = listing.search_with_filters(
+            db=db,
+            filters=filters,
+            skip=0,
+            limit=limit
+        )
+        
+        # Фильтруем только объявления с координатами
+        listings_with_coords = [l for l in listings_data if l.latitude and l.longitude]
+        
+        total_count = len(listings_with_coords)
+        
+        # Формируем ответ
+        response_data = {
+            "success": True,
+            "total": total_count,
+            "listings": [
+                {
+                    "id": str(l.id),
+                    "source_site": l.source,
+                    "original_id": l.external_id,
+                    "url": l.url,
+                    "title": l.title,
+                    "price": l.price,
+                    "address_text": l.address,
+                    "latitude": l.latitude,
+                    "longitude": l.longitude,
+                    "area_sqm": l.area,
+                    "num_rooms": l.rooms,
+                    "images": l.images if l.images else []
+                }
+                for l in listings_with_coords
+            ]
+        }
+        
+        return response_data
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при получении объявлений для карты: {str(e)}"
+        ) 
 
 
 @router.get("/{listing_id}", response_model=dict)

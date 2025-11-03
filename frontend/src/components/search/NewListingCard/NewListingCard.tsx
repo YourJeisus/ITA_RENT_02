@@ -29,13 +29,14 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
   // ===== Обработка изображений =====
   const getImages = (): string[] => {
-    if (listing.photos_urls && listing.photos_urls.length > 0) {
-      return listing.photos_urls;
+    // Пробуем все возможные поля с изображениями
+    const images = listing.images || listing.photos_urls || listing.imageUrls;
+
+    if (images && Array.isArray(images) && images.length > 0) {
+      return images;
     }
-    if (listing.imageUrls && listing.imageUrls.length > 0) {
-      return listing.imageUrls;
-    }
-    return ["https://via.placeholder.com/306x200?text=No+Image"];
+
+    return ["/placeholder-property.jpg"];
   };
 
   const images = getImages();
@@ -312,6 +313,13 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
           src={currentImage}
           alt={title}
           className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback к локальному плейсхолдеру при ошибке
+            e.currentTarget.src = "/placeholder-property.jpg";
+          }}
+          onLoad={() => {
+            // Изображение успешно загружено
+          }}
         />
 
         {/* Image indicators (dots) */}

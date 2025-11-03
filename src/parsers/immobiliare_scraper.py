@@ -1,681 +1,373 @@
 #!/usr/bin/env python3
 """
-🚀 НОВЫЙ АСИНХРОННЫЙ СКРАПЕР ДЛЯ IMMOBILIARE.IT V2
-Создан с нуля на основе актуальной документации ScraperAPI
-
-Основные принципы:
-✅ Правильная реализация ScraperAPI Async API
-✅ Job submission -> Status polling -> Result extraction
-✅ Правильная дедупликация по external_id
-✅ Обработка разных страниц с разными объявлениями
-✅ Fallback на обычный API при проблемах
-✅ Геокодирование через OpenStreetMap
+🚀 УПРОЩЕННЫЙ ПАРАЛЛЕЛЬНЫЙ ПАРСЕР IMMOBILIARE.IT
+Простой запрос без рендеринга + парсинг детальных страниц для описания
 """
 import asyncio
 import aiohttp
-import logging
+from bs4 import BeautifulSoup
+from src.core.config import settings
 import json
 import re
-import time
-from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
-from bs4 import BeautifulSoup
-from ..core.config import settings
-
-logger = logging.getLogger(__name__)
-
+from typing import List, Dict, Any, Optional
 
 class ImmobiliareScraper:
-    """
-    Новый асинхронный скрапер для Immobiliare.it
-    Правильная реализация ScraperAPI Async API
-    """
+    """Простой парсер Immobiliare без лишних параметров"""
     
-    def __init__(self, enable_geocoding: bool = True):
-        self.name = "Immobiliare.it Async Scraper V2"
+    def __init__(self, enable_geocoding: bool = False):
         self.base_url = "https://www.immobiliare.it"
         self.search_url = "https://www.immobiliare.it/affitto-case/roma/?criterio=data&ordine=desc"
-        self.enable_geocoding = enable_geocoding
+        self.api_url = "https://api.scraperapi.com/"
+        self.api_key = settings.SCRAPERAPI_KEY
+        self.enable_geocoding = enable_geocoding  # Для совместимости с интерфейсом
         
-        # ScraperAPI endpoints
-        self.async_jobs_url = "https://async.scraperapi.com/jobs"
-        self.sync_api_url = "https://api.scraperapi.com"
-        
-        # Настройки таймаутов
-        self.job_submit_timeout = 30
-        self.job_poll_timeout = 300  # 5 минут максимум
-        self.sync_request_timeout = 70  # Рекомендуется в документации
-        
-        # Кеш для дедупликации
-        self.seen_listing_ids: Set[str] = set()
+        self.stats = {
+            'list_pages_success': 0,
+            'list_pages_failed': 0,
+            'details_success': 0,
+            'details_failed': 0,
+            'with_description': 0,
+            'with_coords': 0,
+        }
     
-    def build_page_url(self, page: int) -> str:
-        """Строит URL для конкретной страницы"""
-        if page <= 1:
-            return self.search_url
-        return f"{self.search_url}&pag={page}"
-    
-    async def submit_async_job(self, url: str, page_num: int) -> Optional[Dict[str, Any]]:
-        """
-        Отправляет задачу в ScraperAPI Async Jobs API
-        
-        Согласно документации:
-        POST https://async.scraperapi.com/jobs
-        {
-            "apiKey": "YOUR_API_KEY",
-            "url": "target_url",
-            "render": true/false,
-            "premium": true/false,
-            ...
-        }
-        """
-        if not settings.SCRAPERAPI_KEY:
-            logger.error("❌ SCRAPERAPI_KEY не установлен")
-            return None
-        
-        payload = {
-            "apiKey": settings.SCRAPERAPI_KEY,
-            "url": url,
-            "render": False,  # Не используем JS рендеринг (он вызывал ошибки)
-            "premium": False,  # Базовые прокси
-            "country_code": "it",
-            "device_type": "desktop"
-        }
-        
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        timeout = aiohttp.ClientTimeout(total=self.job_submit_timeout)
+    async def fetch_html(self, session: aiohttp.ClientSession, url: str, use_simple: bool = True) -> Optional[str]:
+        """Получает HTML через ScraperAPI"""
+        if use_simple:
+            # Простой запрос - быстрый и дешевый
+            params = {
+                'api_key': self.api_key,
+                'url': url
+            }
+        else:
+            # Для детальных страниц используем ultra_premium
+            params = {
+                'api_key': self.api_key,
+                'url': url,
+                'render': 'true',
+                'ultra_premium': 'true'
+            }
         
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    self.async_jobs_url,
-                    json=payload,
-                    headers=headers
-                ) as response:
-                    
-                    response_text = await response.text()
-                    
-                    if response.status == 200:
-                        try:
-                            job_data = json.loads(response_text)
-                            job_id = job_data.get("id")
-                            status = job_data.get("status")
-                            status_url = job_data.get("statusUrl")
-                            
-                            logger.debug(f"📤 Job {job_id} создан для страницы {page_num}")
-                            return {
-                                "id": job_id,
-                                "status": status,
-                                "statusUrl": status_url,
-                                "page_num": page_num,
-                                "url": url
-                            }
-                        except json.JSONDecodeError as e:
-                            logger.error(f"❌ Ошибка парсинга JSON ответа: {e}")
-                            return None
-                    else:
-                        logger.error(f"❌ HTTP ошибка {response.status} для страницы {page_num}")
-                        return None
-                        
-        except Exception as e:
-            logger.error(f"❌ Исключение при создании job для страницы {page_num}: {e}")
-            return None
-    
-    async def poll_job_status(self, job_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Опрашивает статус задачи до завершения
-        
-        GET https://async.scraperapi.com/jobs/{job_id}
-        """
-        job_id = job_data.get("id")
-        status_url = job_data.get("statusUrl")
-        page_num = job_data.get("page_num")
-        
-        if not status_url:
-            logger.error(f"❌ Нет statusUrl для job {job_id}")
-            return None
-        
-        start_time = time.time()
-        poll_interval = 3  # Начинаем с 3 секунд
-        max_poll_interval = 15  # Максимум 15 секунд
-        
-        timeout = aiohttp.ClientTimeout(total=30)
-        
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                while time.time() - start_time < self.job_poll_timeout:
-                    elapsed = time.time() - start_time
-                    
-                    try:
-                        async with session.get(status_url) as response:
-                            if response.status != 200:
-                                await asyncio.sleep(poll_interval)
-                                continue
-                            
-                            response_text = await response.text()
-                            
-                            try:
-                                job_status = json.loads(response_text)
-                            except json.JSONDecodeError:
-                                await asyncio.sleep(poll_interval)
-                                continue
-                            
-                            status = job_status.get("status")
-                            
-                            if status == "finished":
-                                logger.debug(f"✅ Job {job_id} (страница {page_num}) завершен за {elapsed:.1f}s")
-                                return job_status
-                            
-                            elif status == "failed":
-                                fail_reason = job_status.get("failReason", "unknown")
-                                logger.error(f"❌ Job {job_id} провалился: {fail_reason}")
-                                return None
-                            
-                            elif status in ["queued", "running"]:
-                                # Просто ждем без лишних логов
-                                await asyncio.sleep(poll_interval)
-                                # Постепенно увеличиваем интервал
-                                poll_interval = min(poll_interval * 1.2, max_poll_interval)
-                                continue
-                            
-                            else:
-                                logger.warning(f"⚠️ Неизвестный статус {status} для job {job_id}")
-                                await asyncio.sleep(poll_interval)
-                                continue
-                    
-                    except asyncio.TimeoutError:
-                        logger.warning(f"⚠️ Таймаут при опросе job {job_id}")
-                        await asyncio.sleep(poll_interval)
-                        continue
-                    
-                    except Exception as e:
-                        logger.warning(f"⚠️ Ошибка при опросе job {job_id}: {e}")
-                        await asyncio.sleep(poll_interval)
-                        continue
-                
-                # Превышен общий таймаут
-                logger.error(f"⏰ Превышено время ожидания для job {job_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"❌ Критическая ошибка при опросе job {job_id}: {e}")
-            return None
-    
-    async def scrape_page_sync_fallback(self, page_num: int) -> Optional[str]:
-        """
-        Fallback на обычный ScraperAPI при проблемах с Async API
-        """
-        url = self.build_page_url(page_num)
-        
-        params = {
-            "api_key": settings.SCRAPERAPI_KEY,
-            "url": url,
-            "render": "false",  # Без JS рендеринга
-        }
-        
-        timeout = aiohttp.ClientTimeout(total=self.sync_request_timeout)
-        
-        try:
-            logger.info(f"🔄 Fallback sync API для страницы {page_num}")
-            
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(self.sync_api_url, params=params) as response:
-                    if response.status == 200:
-                        html_content = await response.text()
-                        
-                        # Проверяем, что получили валидный контент
-                        if len(html_content) > 5000 and "immobiliare" in html_content.lower():
-                            logger.info(f"✅ Sync fallback успешен для страницы {page_num}")
-                            return html_content
-                        else:
-                            logger.warning(f"⚠️ Получен невалидный контент для страницы {page_num}")
-                            return None
-                    else:
-                        logger.error(f"❌ Sync fallback HTTP {response.status} для страницы {page_num}")
-                        return None
-                        
-        except Exception as e:
-            logger.error(f"❌ Sync fallback исключение для страницы {page_num}: {e}")
-            return None
-    
-    async def scrape_single_page(self, page_num: int) -> List[Dict[str, Any]]:
-        """
-        Скрапит одну страницу через Async API с fallback
-        """
-        url = self.build_page_url(page_num)
-        
-        # Шаг 1: Попытка через Async API
-        job_data = await self.submit_async_job(url, page_num)
-        
-        html_content = None
-        
-        if job_data:
-            # Шаг 2: Ожидание завершения job
-            job_result = await self.poll_job_status(job_data)
-            
-            if job_result:
-                # Шаг 3: Извлечение HTML из результата
-                response_data = job_result.get("response", {})
-                html_content = response_data.get("body")
-                status_code = response_data.get("statusCode", 0)
-                
-                if html_content and status_code == 200:
-                    logger.info(f"✅ Async API успешен для страницы {page_num}")
+            timeout = aiohttp.ClientTimeout(total=90)
+            async with session.get(self.api_url, params=params, timeout=timeout) as response:
+                if response.status == 200:
+                    return await response.text()
                 else:
-                    logger.warning(f"⚠️ Проблема с Async API для страницы {page_num} (код: {status_code})")
-                    html_content = None
-        
-        # Fallback на sync API если async не сработал
-        if not html_content:
-            html_content = await self.scrape_page_sync_fallback(page_num)
-        
-        if not html_content:
-            logger.error(f"❌ Не удалось получить HTML для страницы {page_num}")
-            return []
-        
-        # Парсим HTML
-        return await self.parse_html_content(html_content, page_num)
-    
-    async def parse_html_content(self, html_content: str, page_num: int) -> List[Dict[str, Any]]:
-        """
-        Парсит HTML контент и извлекает объявления
-        """
-        try:
-            # Извлекаем JSON данные из __NEXT_DATA__
-            soup = BeautifulSoup(html_content, 'html.parser')
-            script_tag = soup.find('script', id='__NEXT_DATA__')
-            
-            if not script_tag:
-                logger.warning(f"⚠️ Не найден __NEXT_DATA__ на странице {page_num}")
-                return []
-            
-            try:
-                json_data = json.loads(script_tag.string)
-            except json.JSONDecodeError as e:
-                logger.error(f"❌ Ошибка парсинга JSON на странице {page_num}: {e}")
-                return []
-            
-            # Извлекаем массив объявлений
-            try:
-                results = json_data['props']['pageProps']['dehydratedState']['queries'][0]['state']['data']['results']
-            except (KeyError, IndexError, TypeError) as e:
-                logger.warning(f"⚠️ Не найден массив results на странице {page_num}: {e}")
-                return []
-            
-            if not results:
-                logger.info(f"🔚 Пустая страница {page_num}")
-                return []
-            
-            # Парсим каждое объявление
-            page_listings = []
-            for listing_json in results:
-                parsed_listing = await self.parse_single_listing(listing_json)
-                if parsed_listing:
-                    # Проверяем дедупликацию
-                    listing_id = parsed_listing.get('external_id')
-                    if listing_id and listing_id not in self.seen_listing_ids:
-                        self.seen_listing_ids.add(listing_id)
-                        page_listings.append(parsed_listing)
-            
-            logger.debug(f"✅ Страница {page_num}: {len(page_listings)}/{len(results)} уникальных")
-            return page_listings
-            
+                    print(f"    ❌ HTTP {response.status}")
+                return None
+        except asyncio.TimeoutError:
+            print(f"    ⏰ Таймаут")
+            return None
         except Exception as e:
-            logger.error(f"❌ Ошибка парсинга HTML страницы {page_num}: {e}")
-            return []
+            print(f"    ❌ Ошибка: {e}")
+            return None
     
-    async def parse_single_listing(self, listing_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Парсит одно объявление из JSON
-        """
+    def extract_next_data(self, html: str) -> Optional[Dict[str, Any]]:
+        """Извлекает данные из __NEXT_DATA__"""
         try:
-            estate = listing_json.get('realEstate', {})
-            if not estate:
-                return None
+            soup = BeautifulSoup(html, 'html.parser')
+            script = soup.find('script', id='__NEXT_DATA__')
             
-            properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
+            if script and script.string:
+                return json.loads(script.string)
             
-            # Основные данные
-            title = properties.get('caption')
-            canonical_url = listing_json.get('seo', {}).get('url')
+            return None
+        except Exception:
+            return None
+    
+    def parse_list_page(self, html: str) -> List[Dict[str, Any]]:
+        """Парсит страницу со списком"""
+        next_data = self.extract_next_data(html)
+        
+        if not next_data:
+            return []
+        
+        try:
+            results = next_data['props']['pageProps']['dehydratedState']['queries'][0]['state']['data']['results']
             
-            if not title or not canonical_url:
-                return None
-            
-            # Извлекаем ID из URL
-            external_id = None
-            if canonical_url:
+            listings = []
+            for item in results:
+                estate = item.get('realEstate', {})
+                properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
+                
+                # URL
+                canonical_url = item.get('seo', {}).get('url')
+                if not canonical_url:
+                    continue
+                
+                # ID
+                external_id = None
                 match = re.search(r'/annunci/(\d+)/', canonical_url)
                 if match:
                     external_id = match.group(1)
+                
+                if not external_id:
+                    continue
+                
+                # Координаты
+                lat, lon = self._extract_coords(item)
+                
+                listing = {
+                    'external_id': f"immobiliare_{external_id}",
+                    'url': canonical_url,
+                    'title': properties.get('caption', ''),
+                    'price': estate.get('price', {}).get('value'),
+                    'property_type': self._normalize_property_type(properties.get('typology', {}).get('name', '')),
+                    'rooms': self._extract_number(properties.get('rooms')),
+                    'bathrooms': self._extract_number(properties.get('bathrooms')),
+                    'area_sqm': self._extract_number(properties.get('surface')),
+                    'floor': self._extract_floor(properties.get('floor')),
+                    'address': properties.get('location', {}).get('caption', ''),
+                    'latitude': lat,
+                    'longitude': lon,
+                    'images': self._extract_images(item),
+                    'agency_name': estate.get('advertiser', {}).get('agency', {}).get('displayName'),
+                    'features': [],
+                    'description': '',  # Будет заполнено позже
+                    'source': 'immobiliare',
+                    'city': 'Roma',
+                    'scraped_at': datetime.utcnow().isoformat()
+                }
+                
+                listings.append(listing)
             
-            if not external_id:
-                logger.warning(f"⚠️ Не удалось извлечь ID из URL: {canonical_url}")
-                return None
+            return listings
             
-            # Цена
-            price_info = estate.get('price', {})
-            price = price_info.get('value')
-            
-            # Характеристики
-            rooms = self._extract_number(properties.get('rooms', ''))
-            area = self._extract_number(properties.get('surface', ''))
-            bathrooms = self._extract_number(properties.get('bathrooms', ''))
-            
-            # Фотографии
-            images = self._extract_images(listing_json)
-            
-            # Адрес и координаты
-            address = self._extract_address(listing_json)
-            
-            if self.enable_geocoding:
-                latitude, longitude = await self._extract_coordinates_with_geocoding(listing_json)
-            else:
-                latitude, longitude = self._extract_coordinates(listing_json)
-            
-            # Тип недвижимости
-            property_type = self._normalize_property_type(properties, title)
-            
-            return {
-                'external_id': external_id,
-                'source': 'immobiliare',
-                'url': canonical_url,
-                'title': title,
-                'description': properties.get('description', ''),
-                'price': price,
-                'price_currency': 'EUR',
-                'property_type': property_type,
-                'rooms': rooms,
-                'bathrooms': bathrooms,
-                'area': area,
-                'floor': str(properties.get('floor', '')),
-                'furnished': self._is_furnished(properties, title),
-                'pets_allowed': None,
-                'features': self._extract_features(properties),
-                'address': address,
-                'city': 'Roma',
-                'district': None,
-                'postal_code': None,
-                'latitude': latitude,
-                'longitude': longitude,
-                'images': images,
-                'virtual_tour_url': None,
-                'agency_name': estate.get('advertiser', {}).get('agency', {}).get('displayName'),
-                'contact_info': None,
-                'is_active': True,
-                'published_at': None,
-                'scraped_at': datetime.utcnow().isoformat()
-            }
-            
+        except KeyError as e:
+            print(f"❌ Ошибка ключа при парсинге списка: {e}")
+            print(f"   Доступные ключи: {list(next_data.get('props', {}).get('pageProps', {}).keys()) if next_data else 'N/A'}")
+            return []
         except Exception as e:
-            logger.error(f"❌ Ошибка парсинга объявления: {e}")
-            return None
+            print(f"❌ Ошибка парсинга списка: {e}")
+            return []
     
-    async def scrape_multiple_pages(self, max_pages: int = 10) -> List[Dict[str, Any]]:
-        """
-        ОСНОВНОЙ МЕТОД: Скрапит несколько страниц асинхронно
-        """
-        logger.info(f"🚀 Запуск парсинга {max_pages} страниц...")
-        
-        start_time = time.time()
-        
-        # Очищаем кеш дедупликации
-        self.seen_listing_ids.clear()
-        
-        # Создаем задачи для всех страниц с ограничением параллелизма
-        semaphore = asyncio.Semaphore(3)  # Максимум 3 параллельных запроса
-        
-        async def scrape_page_with_semaphore(page_num: int):
-            async with semaphore:
-                return await self.scrape_single_page(page_num)
-        
-        # Создаем задачи
-        tasks = []
-        for page_num in range(1, max_pages + 1):
-            task = scrape_page_with_semaphore(page_num)
-            tasks.append(task)
-        
-        logger.info(f"🔄 Запускаем {len(tasks)} задач с семафором...")
-        
-        # Выполняем все задачи параллельно
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Собираем результаты
-        all_listings = []
-        successful_pages = 0
-        error_pages = 0
-        
-        for page_num, result in enumerate(results, 1):
-            if isinstance(result, Exception):
-                logger.error(f"❌ Ошибка на странице {page_num}: {result}")
-                error_pages += 1
-            elif isinstance(result, list):
-                all_listings.extend(result)
-                if result:
-                    successful_pages += 1
-                else:
-                    logger.debug(f"🔚 Страница {page_num}: пустая")
-            else:
-                logger.warning(f"⚠️ Неожиданный результат для страницы {page_num}: {type(result)}")
-        
-        elapsed_time = time.time() - start_time
-        
-        logger.info(f"✅ Парсинг завершен: {len(all_listings)} объявлений за {elapsed_time:.1f}с")
-        
-        return all_listings
-    
-    # Вспомогательные методы
-    def _extract_number(self, value: str) -> Optional[int]:
-        """Извлекает число из строки"""
+    def _extract_number(self, value) -> Optional[int]:
         if not value:
             return None
         match = re.search(r'\d+', str(value))
         return int(match.group(0)) if match else None
     
-    def _extract_images(self, listing_json: Dict[str, Any]) -> List[str]:
-        """Извлекает все фотографии из объявления"""
+    def _extract_floor(self, floor_data) -> Optional[str]:
+        """Извлекает этаж"""
+        if not floor_data:
+            return None
+        if isinstance(floor_data, dict):
+            return floor_data.get('value') or floor_data.get('abbreviation')
+        return str(floor_data)
+    
+    def _extract_coords(self, item: Dict) -> tuple:
+        try:
+            estate = item.get('realEstate', {})
+            properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
+            
+            location = properties.get('location', {})
+            lat = location.get('latitude') or location.get('lat')
+            lon = location.get('longitude') or location.get('lng')
+            
+            if lat and lon:
+                return float(lat), float(lon)
+            
+            return None, None
+        except:
+            return None, None
+    
+    def _extract_images(self, item: Dict) -> List[str]:
         images = []
         try:
-            estate = listing_json.get('realEstate', {})
+            estate = item.get('realEstate', {})
             properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
             
             multimedia = properties.get('multimedia', {})
-            photo_list = multimedia.get('photos', [])
+            photos = multimedia.get('photos', [])
             
-            for photo in photo_list:
+            for photo in photos[:20]:  # Максимум 20 изображений
                 if isinstance(photo, dict) and 'urls' in photo:
                     urls = photo['urls']
                     # Берем лучшее качество
                     for size in ['large', 'medium', 'small']:
                         if size in urls and urls[size]:
-                            photo_url = urls[size]
-                            if photo_url and photo_url not in images:
-                                images.append(photo_url)
+                            if urls[size] not in images:
+                                images.append(urls[size])
                             break
             
             return images
-            
-        except Exception as e:
-            logger.debug(f"Ошибка извлечения фото: {e}")
+        except:
             return []
     
-    def _extract_address(self, listing_json: Dict[str, Any]) -> Optional[str]:
-        """Извлекает адрес из JSON"""
-        try:
-            estate = listing_json.get('realEstate', {})
-            properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
-            
-            address_fields = [
-                properties.get('address'),
-                properties.get('location', {}).get('address'),
-                properties.get('street'),
-                estate.get('address')
-            ]
-            
-            for addr in address_fields:
-                if addr and isinstance(addr, str) and len(addr.strip()) > 5:
-                    return addr.strip()
-            
-            return None
-            
-        except Exception:
-            return None
-    
-    def _extract_coordinates(self, listing_json: Dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
-        """Извлекает координаты из JSON"""
-        try:
-            estate = listing_json.get('realEstate', {})
-            properties = estate.get('properties', [{}])[0] if estate.get('properties') else {}
-            
-            location_sources = [
-                properties.get('location', {}),
-                estate.get('location', {}),
-                properties.get('coordinates', {}),
-                estate.get('coordinates', {})
-            ]
-            
-            for location in location_sources:
-                lat = location.get('latitude') or location.get('lat')
-                lon = location.get('longitude') or location.get('lng')
-                
-                if lat and lon:
-                    lat, lon = float(lat), float(lon)
-                    # Проверка для Италии
-                    if 35.0 <= lat <= 47.0 and 6.0 <= lon <= 19.0:
-                        return lat, lon
-            
-            return None, None
-            
-        except Exception:
-            return None, None
-    
-    async def _extract_coordinates_with_geocoding(self, listing_json: Dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
-        """Извлекает координаты из JSON или через геокодирование"""
-        # Сначала пытаемся найти в JSON
-        lat, lon = self._extract_coordinates(listing_json)
-        if lat and lon:
-            return lat, lon
-        
-        # Если нет в JSON, пытаемся геокодировать адрес
-        address = self._extract_address(listing_json)
-        if address and len(address.strip()) > 10:
-            return await self._geocode_address(address, "Roma, Italy")
-        
-        return None, None
-    
-    async def _geocode_address(self, address: str, city: str) -> tuple[Optional[float], Optional[float]]:
-        """Геокодирование адреса через OpenStreetMap Nominatim API"""
-        try:
-            full_address = f"{address}, {city}"
-            url = "https://nominatim.openstreetmap.org/search"
-            
-            params = {
-                'q': full_address,
-                'format': 'json',
-                'limit': 1,
-                'countrycodes': 'it',
-                'addressdetails': 1
-            }
-            
-            headers = {
-                'User-Agent': 'ITA_RENT_BOT/2.0 (rental search bot)'
-            }
-            
-            timeout = aiohttp.ClientTimeout(total=10)
-            
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        if data and len(data) > 0:
-                            result = data[0]
-                            lat = float(result.get('lat', 0))
-                            lon = float(result.get('lon', 0))
-                            
-                            if 35.0 <= lat <= 47.0 and 6.0 <= lon <= 19.0:
-                                return lat, lon
-                        
-                    await asyncio.sleep(1)  # Уважаем лимиты API
-                    
-            return None, None
-            
-        except Exception as e:
-            logger.debug(f"Ошибка геокодирования для '{address}': {e}")
-            return None, None
-    
-    def _normalize_property_type(self, properties: Dict[str, Any], title: str) -> str:
+    def _normalize_property_type(self, type_str: str) -> str:
         """Нормализует тип недвижимости"""
-        property_type = None
-        if properties.get('typology', {}).get('name'):
-            property_type = properties['typology']['name']
-        
-        type_mapping = {
+        mapping = {
             'Appartamento': 'apartment',
             'Villa': 'house',
             'Casa': 'house',
-            'Villetta': 'house',
-            'Attico': 'penthouse',         # Исправлено: пентхаус
-            'Superattico': 'penthouse',    # Супер-пентхаус
-            'Loft': 'apartment',
-            'Monolocale': 'studio',        # Студия
-            'Studio': 'studio',            # Студия (англ.)
-            'Bilocale': 'apartment',
-            'Trilocale': 'apartment',
-            'Quadrilocale': 'apartment',
-            'Plurilocale': 'apartment',
+            'Attico': 'penthouse',
+            'Superattico': 'penthouse',
+            'Monolocale': 'studio',
+            'Studio': 'studio',
             'Stanza': 'room',
-            'Posto letto': 'room',
             'Camera': 'room'
         }
-        
-        if property_type and property_type in type_mapping:
-            return type_mapping[property_type]
-        
-        title_lower = title.lower()
-        
-        # Приоритетный анализ заголовка
-        if any(word in title_lower for word in ['attico', 'superattico', 'penthouse']):
-            return 'penthouse'
-        elif any(word in title_lower for word in ['monolocale', 'studio']):
-            return 'studio'
-        elif any(word in title_lower for word in ['villa', 'casa', 'villetta']):
-            return 'house'
-        elif any(word in title_lower for word in ['stanza', 'posto letto', 'camera', 'room']):
-            return 'room'
-        
-        return 'apartment'
+        return mapping.get(type_str, 'apartment')
     
-    def _is_furnished(self, properties: Dict[str, Any], title: str) -> Optional[bool]:
-        """Определяет, меблированная ли недвижимость"""
-        furnished_info = properties.get('furnished')
-        if furnished_info is not None:
-            return bool(furnished_info)
-        
-        title_lower = title.lower()
-        if any(word in title_lower for word in ['arredato', 'arredata', 'arredati', 'furnished']):
-            return True
-        elif any(word in title_lower for word in ['non arredato', 'non arredata', 'vuoto']):
-            return False
-        
-        return None
+    def parse_detail_page(self, html: str) -> Optional[str]:
+        """Извлекает полное описание из детальной страницы"""
+        try:
+            next_data = self.extract_next_data(html)
+            
+            if not next_data:
+                return None
+            
+            # Вариант 1: в props.listing
+            page_props = next_data.get('props', {}).get('pageProps', {})
+            listing_data = page_props.get('listing', {})
+            
+            if 'properties' in listing_data:
+                desc = listing_data['properties'].get('description')
+                if desc:
+                    return desc
+            
+            # Вариант 2: в dehydratedState.queries
+            queries = page_props.get('dehydratedState', {}).get('queries', [])
+            for query in queries:
+                state_data = query.get('state', {}).get('data', {})
+                if 'properties' in state_data:
+                    desc = state_data['properties'].get('description')
+                    if desc:
+                        return desc
+            
+            # Вариант 3: Поиск в HTML
+            soup = BeautifulSoup(html, 'html.parser')
+            desc_div = soup.find('div', class_=lambda x: x and 'description' in str(x).lower())
+            if desc_div:
+                return desc_div.get_text(strip=True)
+            
+            return None
+            
+        except Exception as e:
+            return None
     
-    def _extract_features(self, properties: Dict[str, Any]) -> List[str]:
-        """Извлекает дополнительные характеристики"""
-        features = []
+    async def scrape_multiple_pages(self, max_pages: int = 5):
+        """Основной метод с параллельным парсингом (совместимый интерфейс)"""
+        return await self.scrape_listings(num_pages=max_pages, max_details=0)
+    
+    async def scrape_listings(self, num_pages: int = 2, max_details: int = 10):
+        """Основной метод парсинга"""
+        print("=" * 80)
+        print(f"🚀 ПАРСИНГ IMMOBILIARE.IT С ДЕТАЛЬНОЙ ИНФОРМАЦИЕЙ")
+        print("=" * 80)
+        print(f"📄 Страниц списков: {num_pages}")
+        print(f"📝 Детальных страниц: до {max_details}")
+        print("=" * 80)
         
-        if properties.get('hasElevator'):
-            features.append('elevator')
-        if properties.get('hasParking'):
-            features.append('parking')
-        if properties.get('hasBalcony'):
-            features.append('balcony')
-        if properties.get('hasTerrace'):
-            features.append('terrace')
-        if properties.get('hasGarden'):
-            features.append('garden')
+        start_time = datetime.utcnow()
         
-        return features 
+        async with aiohttp.ClientSession() as session:
+            # ЭТАП 1: Собираем URL со страниц списков
+            print("\n📋 ЭТАП 1: Сбор базовой информации")
+            print("-" * 80)
+            
+            all_listings = []
+            for page_num in range(1, num_pages + 1):
+                if page_num == 1:
+                    page_url = self.search_url
+                else:
+                    page_url = f"{self.search_url}&pag={page_num}"
+                
+                print(f"Страница {page_num}: {page_url}")
+                html = await self.fetch_html(session, page_url, use_simple=True)
+                
+                if html:
+                    print(f"    ✅ Получено {len(html)} символов")
+                    listings = self.parse_list_page(html)
+                    print(f"    📊 Найдено {len(listings)} объявлений")
+                    all_listings.extend(listings)
+                    self.stats['list_pages_success'] += 1
+                else:
+                    print(f"    ❌ Не удалось получить HTML")
+                    self.stats['list_pages_failed'] += 1
+            
+            print(f"\n📊 ВСЕГО: {len(all_listings)} объявлений")
+            
+            # Ограничиваем количество детальных страниц
+            listings_to_detail = all_listings[:max_details]
+            
+            # ЭТАП 2: Парсим детальные страницы
+            print("\n" + "=" * 80)
+            print(f"🔍 ЭТАП 2: Парсинг детальных страниц ({len(listings_to_detail)} шт)")
+            print("=" * 80)
+            
+            for i, listing in enumerate(listings_to_detail, 1):
+                print(f"[{i}/{len(listings_to_detail)}] {listing['url']}")
+                
+                detail_html = await self.fetch_html(session, listing['url'], use_simple=False)
+                
+                if detail_html:
+                    description = self.parse_detail_page(detail_html)
+                    
+                    if description:
+                        listing['description'] = description
+                        self.stats['with_description'] += 1
+                        print(f"    ✅ Описание: {len(description)} символов")
+                    else:
+                        print(f"    ⚠️ Описание не найдено")
+                    
+                    self.stats['details_success'] += 1
+                else:
+                    print(f"    ❌ Не удалось получить страницу")
+                    self.stats['details_failed'] += 1
+                
+                # Статистика координат
+                if listing.get('latitude'):
+                    self.stats['with_coords'] += 1
+        
+        end_time = datetime.utcnow()
+        elapsed = (end_time - start_time).total_seconds()
+        
+        # ИТОГИ
+        print("\n" + "=" * 80)
+        print("📊 ИТОГОВАЯ СТАТИСТИКА")
+        print("=" * 80)
+        print(f"📄 Страниц списков:")
+        print(f"   ✅ Успешно: {self.stats['list_pages_success']}")
+        print(f"   ❌ Ошибки: {self.stats['list_pages_failed']}")
+        print()
+        print(f"📝 Детальные страницы:")
+        print(f"   ✅ Успешно: {self.stats['details_success']}")
+        print(f"   ❌ Ошибки: {self.stats['details_failed']}")
+        print()
+        print(f"📊 Качество данных:")
+        print(f"   📝 С полным описанием: {self.stats['with_description']}/{len(listings_to_detail)}")
+        print(f"   🌍 С координатами: {self.stats['with_coords']}/{len(all_listings)}")
+        print(f"   🖼️  С изображениями: {sum(1 for l in all_listings if l.get('images'))}/{len(all_listings)}")
+        print()
+        print(f"⏱️  Общее время: {elapsed:.1f} секунд")
+        if listings_to_detail:
+            print(f"⚡ Среднее время детальной страницы: {elapsed/len(listings_to_detail):.2f} сек")
+        
+        return all_listings
+
+
+async def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pages', type=int, default=2, help='Страниц списков')
+    parser.add_argument('--details', type=int, default=10, help='Детальных страниц')
+    
+    args = parser.parse_args()
+    
+    scraper = ImmobiliareSimpleScraper()
+    listings = await scraper.scrape_listings(num_pages=args.pages, max_details=args.details)
+    
+    if listings:
+        output_file = '/tmp/immobiliare_results.json'
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(listings, f, ensure_ascii=False, indent=2)
+        
+        print(f"\n💾 Результаты сохранены в {output_file}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+

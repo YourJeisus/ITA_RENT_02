@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import process from "process";
+import http from "http";
 
 // Получаем __dirname для ES модулей
 const __filename = fileURLToPath(import.meta.url);
@@ -37,12 +38,37 @@ app.use((req, res, next) => {
   next();
 });
 
-// Добавляем middleware для обработки ошибок Express
-app.use((err, req, res) => {
-  console.error("Express error:", err);
-  res
-    .status(500)
-    .json({ error: "Internal server error", message: err.message });
+// 🔴 ВАЖНО: Проксируем API запросы на backend ДО статических файлов!
+app.use("/api/v1", (req, res) => {
+  const backendUrl = "http://localhost:8000";
+  // ВАЖНО: Добавляем /api/v1 перед путем потому что express.Router удаляет его
+  const fullPath = `/api/v1${req.url}`;
+  const targetUrl = `${backendUrl}${fullPath}`;
+  
+  console.log(`🔗 Проксирую запрос: ${req.method} ${req.url} -> ${fullPath}`);
+  
+  const options = {
+    hostname: "localhost",
+    port: 8000,
+    path: fullPath,
+    method: req.method,
+    headers: req.headers,
+  };
+  
+  // Удаляем host header чтобы не было конфликтов
+  delete options.headers.host;
+  
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+  
+  proxyReq.on("error", (err) => {
+    console.error("❌ Proxy error:", err);
+    res.status(503).json({ error: "Backend unavailable", details: err.message });
+  });
+  
+  req.pipe(proxyReq);
 });
 
 // Root endpoint для быстрой проверки
@@ -111,6 +137,14 @@ app.get("*", (req, res) => {
       .status(500)
       .json({ error: "Error serving SPA route", message: error.message });
   }
+});
+
+// Добавляем middleware для обработки ошибок Express (ДОЛЖЕН БЫТЬ В КОНЦЕ)
+app.use((err, req, res, next) => {
+  console.error("Express error:", err);
+  res
+    .status(500)
+    .json({ error: "Internal server error", message: err.message });
 });
 
 // Обработка uncaught exceptions

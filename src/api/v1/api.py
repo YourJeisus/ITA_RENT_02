@@ -4,6 +4,8 @@
 from fastapi import APIRouter
 
 from src.api.v1 import auth, users, scraping, listings, filters, telegram, whatsapp
+# TODO: Временно отключен для отладки
+# from src.api.v1 import webhooks
 
 api_router = APIRouter()
 
@@ -14,4 +16,5 @@ api_router.include_router(scraping.router, prefix="/scraping", tags=["scraping"]
 api_router.include_router(listings.router, prefix="/listings", tags=["listings"])
 api_router.include_router(filters.router, prefix="/filters", tags=["filters"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
-api_router.include_router(whatsapp.router, prefix="/whatsapp", tags=["whatsapp"]) 
+api_router.include_router(whatsapp.router, prefix="/whatsapp", tags=["whatsapp"])
+# api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"]) 

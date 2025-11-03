@@ -25,9 +25,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.parsers.immobiliare_scraper import ImmobiliareScraper
-from src.parsers.subito_scraper import SubitoScraper
-from src.parsers.idealista_scraper import IdealistaScraper
+from src.parsers import CasaScraper, SubitoScraper, IdealistaScraper, ImmobiliareScraper
 from src.services.scraping_service import ScrapingService
 from src.db.database import SessionLocal
 
@@ -39,11 +37,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def scrape_source(scraper, source_name: str):
+async def scrape_source(scraper, source_name: str, max_pages: int = 10):
     """Парсит один источник и возвращает результаты"""
     try:
         logger.info(f"🚀 Запуск парсинга: {source_name}")
-        listings = await scraper.scrape_multiple_pages(max_pages=10)
+        listings = await scraper.scrape_multiple_pages(max_pages=max_pages)
         logger.info(f"✅ {source_name}: получено {len(listings)} объявлений")
         return source_name, listings
     except Exception as e:
@@ -51,28 +49,18 @@ async def scrape_source(scraper, source_name: str):
         return source_name, []
 
 
-async def main():
+async def main(max_pages: int = 2):
     """
     Основная функция запуска парсинга всех источников
     """
-    print("🚀 Параллельный парсинг всех источников")
-    
-    # Геокодирование включено по умолчанию
-    enable_geocoding = True
-    
-    if len(sys.argv) > 1 and sys.argv[1] == "--no-geo":
-        enable_geocoding = False
-    
-    # Проверяем ScraperAPI ключ
-    from src.core.config import settings
-    if not settings.SCRAPERAPI_KEY:
-        print("❌ ОШИБКА: SCRAPERAPI_KEY не настроен!")
-        return
+    print("🚀 Параллельный парсинг всех источников (Casa.it + Subito + Idealista + Immobiliare)")
+    print(f"📄 Источники: {max_pages} страниц с каждого")
     
     # Инициализируем скраперы
-    immobiliare_scraper = ImmobiliareScraper(enable_geocoding=enable_geocoding)
-    subito_scraper = SubitoScraper(enable_geocoding=enable_geocoding)
-    idealista_scraper = IdealistaScraper(enable_geocoding=enable_geocoding)
+    casa_scraper = CasaScraper(max_concurrent=5, enable_geocoding=False)
+    subito_scraper = SubitoScraper(enable_geocoding=False, fetch_coords=False)
+    idealista_scraper = IdealistaScraper(max_concurrent=5, enable_geocoding=False)
+    immobiliare_scraper = ImmobiliareScraper(enable_geocoding=False)
     scraping_service = ScrapingService()
     
     try:
@@ -81,9 +69,10 @@ async def main():
         
         # Запускаем парсинг всех источников параллельно
         results = await asyncio.gather(
-            scrape_source(immobiliare_scraper, "Immobiliare.it"),
-            scrape_source(subito_scraper, "Subito.it"),
-            scrape_source(idealista_scraper, "Idealista.it"),
+            scrape_source(casa_scraper, "Casa.it", max_pages),
+            scrape_source(subito_scraper, "Subito.it", max_pages),
+            scrape_source(idealista_scraper, "Idealista.it", max_pages),
+            scrape_source(immobiliare_scraper, "Immobiliare.it", max_pages),
             return_exceptions=True
         )
         
@@ -96,11 +85,10 @@ async def main():
         
         for result in results:
             if isinstance(result, Exception):
-                logger.error(f"❌ Ошибка при парсинге: {result}")
+                logger.error(f"❌ Ошибка парсинга: {result}")
                 continue
                 
             source_name, listings = result
-            stats_by_source[source_name] = len(listings)
             all_listings.extend(listings)
             
             # Добавляем source к каждому объявлению если его нет
@@ -112,8 +100,12 @@ async def main():
                         listing['source'] = 'subito'
                     elif 'idealista' in source_name.lower():
                         listing['source'] = 'idealista'
+                    elif 'casa' in source_name.lower():
+                        listing['source'] = 'casa_it'
                     else:
                         listing['source'] = source_name.lower()
+            
+            stats_by_source[source_name] = len(listings)
         
         if not all_listings:
             print("❌ Объявления не найдены ни в одном источнике!")
@@ -131,7 +123,7 @@ async def main():
             print(f"\n✅ Парсинг всех источников завершен за {execution_time:.1f}с")
             print(f"📊 Статистика по источникам:")
             for source, count in stats_by_source.items():
-                print(f"   • {source}: {count} объявлений найдено")
+                print(f"   • {source}: {count} объявлений")
             
             print(f"\n💾 Сохранено в БД:")
             print(f"   • Новых: {saved_stats['created']}")
@@ -155,17 +147,22 @@ async def main():
                     print(f"      🔄 Обновлено: {updated}")
                     print(f"      ⏭️ Пропущено: {skipped}")
                     print(f"      ❌ Ошибки: {errors}")
-                    print(f"      📊 Итого обработано: {total}")
+                    print(f"      📊 Итого: {total}")
             
             print(f"\n⏰ Следующий запуск: {next_run.strftime('%H:%M %d.%m.%Y')} (через 2ч)")
             
         finally:
             db.close()
-        
+            
     except Exception as e:
         logger.error(f"❌ Критическая ошибка: {e}")
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    import argparse
+    parser = argparse.ArgumentParser(description='Парсинг всех источников недвижимости')
+    parser.add_argument('--pages', type=int, default=2, help='Количество страниц для парсинга (default: 2)')
+    args = parser.parse_args()
+    
+    asyncio.run(main(max_pages=args.pages)) 

@@ -51,7 +51,8 @@ export interface Listing {
   property_type?: string;
   listing_type?: string;
   features?: string[];
-  photos_urls?: string[];
+  images?: string[]; // Основное поле для изображений с бэкенда
+  photos_urls?: string[]; // Старое поле для обратной совместимости
   published_at?: string;
   created_at: string;
   last_seen_at: string;

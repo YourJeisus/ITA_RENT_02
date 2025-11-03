@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from src.parsers.immobiliare_scraper import ImmobiliareScraper
+from src.parsers import CasaScraper, SubitoScraper, IdealistaScraper, ImmobiliareScraper
 from src.crud.crud_listing import listing as crud_listing
 from src.schemas.listing import ListingCreate
 from src.db.models import Listing
@@ -17,48 +17,92 @@ logger = logging.getLogger(__name__)
 
 class ScrapingService:
     """
-    Сервис для координации парсинга недвижимости V2
-    Использует новый асинхронный скрапер для максимальной производительности
+    Сервис для координации парсинга недвижимости
+    Поддерживает все 4 источника: Casa.it, Subito, Idealista, Immobiliare
     """
     
     def __init__(self):
-        # Инициализируем асинхронный скрапер
-        self.immobiliare_scraper = ImmobiliareScraper(enable_geocoding=True)
+        # Инициализируем все скраперы
+        self.casa_scraper = CasaScraper(max_concurrent=5, enable_geocoding=False)
+        self.subito_scraper = SubitoScraper(enable_geocoding=False, fetch_coords=False)
+        self.idealista_scraper = IdealistaScraper(max_concurrent=5, enable_geocoding=False)
+        self.immobiliare_scraper = ImmobiliareScraper(enable_geocoding=False)
         
         # Настройки по умолчанию
         self.default_max_pages = 5
         
     def get_available_sources(self) -> List[str]:
         """Получить список доступных источников"""
-        return ['immobiliare']
+        return ['casa_it', 'subito', 'idealista', 'immobiliare']
+    
+    async def scrape_casa_async(
+        self,
+        filters: Dict[str, Any],
+        max_pages: int = None
+    ) -> List[Dict[str, Any]]:
+        """Асинхронный парсинг Casa.it"""
+        if max_pages is None:
+            max_pages = self.default_max_pages
+            
+        try:
+            logger.info(f"🚀 Запускаем парсинг Casa.it на {max_pages} страниц")
+            listings = await self.casa_scraper.scrape_multiple_pages(max_pages=max_pages)
+            logger.info(f"✅ Получено {len(listings)} объявлений из Casa.it")
+            return listings
+        except Exception as e:
+            logger.error(f"❌ Ошибка парсинга Casa.it: {e}")
+            return []
+    
+    async def scrape_subito_async(
+        self,
+        filters: Dict[str, Any],
+        max_pages: int = None
+    ) -> List[Dict[str, Any]]:
+        """Асинхронный парсинг Subito"""
+        if max_pages is None:
+            max_pages = self.default_max_pages
+            
+        try:
+            logger.info(f"🚀 Запускаем парсинг Subito.it на {max_pages} страниц")
+            listings = await self.subito_scraper.scrape_multiple_pages(max_pages=max_pages)
+            logger.info(f"✅ Получено {len(listings)} объявлений из Subito.it")
+            return listings
+        except Exception as e:
+            logger.error(f"❌ Ошибка парсинга Subito.it: {e}")
+            return []
+    
+    async def scrape_idealista_async(
+        self,
+        filters: Dict[str, Any],
+        max_pages: int = None
+    ) -> List[Dict[str, Any]]:
+        """Асинхронный парсинг Idealista"""
+        if max_pages is None:
+            max_pages = self.default_max_pages
+            
+        try:
+            logger.info(f"🚀 Запускаем парсинг Idealista.it на {max_pages} страниц")
+            listings = await self.idealista_scraper.scrape_multiple_pages(max_pages=max_pages)
+            logger.info(f"✅ Получено {len(listings)} объявлений из Idealista.it")
+            return listings
+        except Exception as e:
+            logger.error(f"❌ Ошибка парсинга Idealista.it: {e}")
+            return []
     
     async def scrape_immobiliare_async(
         self,
         filters: Dict[str, Any],
         max_pages: int = None
     ) -> List[Dict[str, Any]]:
-        """
-        Асинхронный парсинг Immobiliare.it
-        
-        Args:
-            filters: Фильтры поиска (пока не используются, парсим Рим)
-            max_pages: Максимальное количество страниц
-            
-        Returns:
-            List[Dict]: Список объявлений
-        """
+        """Асинхронный парсинг Immobiliare.it"""
         if max_pages is None:
             max_pages = self.default_max_pages
             
         try:
-            logger.info(f"🚀 Запускаем асинхронный парсинг Immobiliare.it на {max_pages} страниц")
-            
-            # Запускаем новый асинхронный скрапер
+            logger.info(f"🚀 Запускаем парсинг Immobiliare.it на {max_pages} страниц")
             listings = await self.immobiliare_scraper.scrape_multiple_pages(max_pages=max_pages)
-            
             logger.info(f"✅ Получено {len(listings)} объявлений из Immobiliare.it")
             return listings
-            
         except Exception as e:
             logger.error(f"❌ Ошибка парсинга Immobiliare.it: {e}")
             return []
@@ -83,21 +127,22 @@ class ScrapingService:
             
         logger.info(f"🔍 Начинаем парсинг всех источников (max_pages={max_pages})")
         
+        # Запускаем парсинг всех источников параллельно
+        results = await asyncio.gather(
+            self.scrape_casa_async(filters, max_pages),
+            self.scrape_subito_async(filters, max_pages),
+            self.scrape_idealista_async(filters, max_pages),
+            self.scrape_immobiliare_async(filters, max_pages),
+            return_exceptions=True
+        )
+        
+        # Объединяем результаты
         all_listings = []
-        
-        # Пока у нас только Immobiliare.it, но можно легко добавить другие источники
-        try:
-            immobiliare_listings = await self.scrape_immobiliare_async(filters, max_pages)
-            all_listings.extend(immobiliare_listings)
-        except Exception as e:
-            logger.error(f"❌ Ошибка парсинга Immobiliare.it: {e}")
-        
-        # В будущем можно добавить другие источники:
-        # try:
-        #     idealista_listings = await self.scrape_idealista_async(filters, max_pages)
-        #     all_listings.extend(idealista_listings)
-        # except Exception as e:
-        #     logger.error(f"❌ Ошибка парсинга Idealista.it: {e}")
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"❌ Ошибка парсинга: {result}")
+            elif isinstance(result, list):
+                all_listings.extend(result)
         
         logger.info(f"📊 Всего получено {len(all_listings)} объявлений из всех источников")
         return all_listings
@@ -330,7 +375,7 @@ class ScrapingService:
                 "saved_count": saved_stats["created"],
                 "updated_count": saved_stats["updated"],
                 "error_count": saved_stats["errors"],
-                "sources": ["immobiliare"],
+                "sources": ["casa_it", "subito", "idealista", "immobiliare"],
                 "elapsed_time": elapsed_time
             }
             

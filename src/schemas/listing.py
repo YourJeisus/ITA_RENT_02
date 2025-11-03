@@ -48,7 +48,7 @@ class ListingCreate(ListingBase):
     @field_validator('source')
     @classmethod
     def validate_source(cls, v):
-        allowed_sources = ['idealista', 'immobiliare', 'subito']
+        allowed_sources = ['idealista', 'immobiliare', 'subito', 'casa_it']
         if v not in allowed_sources:
             raise ValueError(f'Источник должен быть одним из: {", ".join(allowed_sources)}')
         return v

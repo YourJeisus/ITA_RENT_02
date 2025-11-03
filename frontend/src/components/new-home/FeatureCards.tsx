@@ -15,7 +15,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   description,
 }) => {
   return (
-    <div className="bg-white min-h-[224px] w-full rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[24px] flex flex-col">
+    <div className="bg-white min-h-[224px] w-[416px] rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] p-[24px] flex flex-col">
       <div className="mb-[24px]">
         <img src={icon} alt="" className="w-[56px] h-[56px]" />
       </div>
@@ -52,10 +52,9 @@ const FeatureCards: React.FC = () => {
   ];
 
   return (
-    <div className="bg-[#eaf4fd] py-[40px] md:py-[56px] lg:py-[60px]">
-      <div className="max-w-[1920px] mx-auto px-4 md:px-8 lg:px-12 xl:px-24 2xl:px-[312px]">
-        {/* 1 колонка на мобильных, 2 на планшетах, 3 на больших экранах */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[16px] lg:gap-[24px]">
+    <div className="bg-[#eaf4fd] py-[60px]">
+      <div className="max-w-[1920px] mx-auto px-[312px]">
+        <div className="flex gap-[24px] justify-between">
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} />
           ))}

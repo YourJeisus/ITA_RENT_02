@@ -1,15 +1,16 @@
 """
 Парсеры для извлечения данных с сайтов недвижимости
 """
-
 from .base_parser import BaseParser
-from .immobiliare_scraper import ImmobiliareScraper
+from .casa_scraper import CasaScraper
 from .subito_scraper import SubitoScraper
 from .idealista_scraper import IdealistaScraper
+from .immobiliare_scraper import ImmobiliareScraper
 
 __all__ = [
     'BaseParser',
-    'ImmobiliareScraper',
+    'CasaScraper',
     'SubitoScraper',
-    'IdealistaScraper'
+    'IdealistaScraper',
+    'ImmobiliareScraper'
 ] 

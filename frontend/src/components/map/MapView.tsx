@@ -1,31 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import styles from './MapView.module.scss';
+import React, { useEffect, useRef } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.markercluster"; // ВАЖНО: импортируем сам плагин
+import styles from "./MapView.module.scss";
 
 // Исправляем иконки маркеров Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
   iconUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
   shadowUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
 interface Listing {
-  id: number;
+  id: string;
   title: string;
-  price: string;
-  location_address: string;
+  price: number;
+  address_text: string;
   latitude?: number;
   longitude?: number;
-  url_details: string;
-  image_urls: string[];
-  area_sqm?: string;
-  rooms_count?: string;
+  url: string;
+  images: string[];
+  area_sqm?: number;
+  num_rooms?: number;
   source_site: string;
 }
 
@@ -35,71 +37,141 @@ interface MapViewProps {
   zoom?: number;
 }
 
-// Компонент для автоматического подгона карты под маркеры
-const FitBounds: React.FC<{ listings: Listing[] }> = ({ listings }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    const validListings = listings.filter(
-      (listing) => listing.latitude && listing.longitude
-    );
-
-    if (validListings.length > 0) {
-      const bounds = L.latLngBounds(
-        validListings.map((listing) => [listing.latitude!, listing.longitude!])
-      );
-      map.fitBounds(bounds, { padding: [20, 20] });
-    }
-  }, [listings, map]);
-
-  return null;
-};
-
 const MapView: React.FC<MapViewProps> = ({
   listings,
-  center = [41.9028, 12.4964], // Рим по умолчанию
+  center = [41.9028, 12.4964],
   zoom = 11,
 }) => {
-  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // Фильтруем объявления с координатами
   const listingsWithCoords = listings.filter(
     (listing) => listing.latitude && listing.longitude
   );
 
-  const formatPrice = (price: string) => {
-    return price
-      .replace(/[^\d]/g, '')
-      .replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
-  };
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
 
-  const getMarkerIcon = (sourcesite: string) => {
-    const color = sourcesite === 'immobiliare.it' ? '#e74c3c' : '#3498db';
+    // Инициализируем карту
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView(center, zoom);
 
-    return L.divIcon({
-      className: 'custom-marker',
-      html: `
-        <div style="
-          background-color: ${color};
-          width: 25px;
-          height: 25px;
-          border-radius: 50%;
-          border: 3px solid white;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: bold;
-          font-size: 12px;
-        ">
-          ${sourcesite === 'immobiliare.it' ? 'I' : 'Id'}
-        </div>
-      `,
-      iconSize: [25, 25],
-      iconAnchor: [12, 12],
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }
+      ).addTo(mapRef.current);
+    }
+
+    const map = mapRef.current;
+
+    // Очищаем старые маркеры
+    map.eachLayer((layer) => {
+      if (layer.options && layer.options.maxClusterRadius !== undefined) {
+        map.removeLayer(layer);
+      }
     });
-  };
+
+    // Создаем группу кластеров
+    const markerClusterGroup = L.markerClusterGroup({
+      maxClusterRadius: 80,
+      showCoverageOnHover: false,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        let size = "30px";
+        let fontSize = "14px";
+
+        if (count > 100) {
+          size = "45px";
+          fontSize = "18px";
+        } else if (count > 50) {
+          size = "40px";
+          fontSize = "16px";
+        } else if (count > 10) {
+          size = "35px";
+          fontSize = "15px";
+        }
+
+        return L.divIcon({
+          html: `
+            <div style="
+              background-color: #1e40af;
+              width: ${size};
+              height: ${size};
+              border-radius: 50%;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: ${fontSize};
+              font-weight: bold;
+              color: white;
+              font-family: Arial, sans-serif;
+            ">
+              ${count}
+            </div>
+          `,
+          iconSize: [parseInt(size), parseInt(size)],
+          iconAnchor: [parseInt(size) / 2, parseInt(size) / 2],
+          className: "marker-cluster",
+        });
+      },
+    });
+
+    // Добавляем маркеры
+    listingsWithCoords.forEach((listing) => {
+      const marker = L.marker([listing.latitude!, listing.longitude!], {
+        icon: L.divIcon({
+          className: "custom-marker",
+          html: `
+            <div style="
+              background-color: #2563EB;
+              width: 25px;
+              height: 25px;
+              border-radius: 50%;
+              box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            "></div>
+          `,
+          iconSize: [25, 25],
+          iconAnchor: [12, 12],
+        }),
+      });
+
+      const popupContent = `
+        <div style="max-width: 250px;">
+          <h4 style="margin: 0 0 10px 0; font-size: 14px;">${listing.title?.substring(0, 60)}</h4>
+          ${listing.images && listing.images.length > 0 ? `<img src="${listing.images[0]}" alt="img" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px; margin-bottom: 10px;" onerror="this.style.display='none'">` : ""}
+          <div style="font-size: 13px; color: #555;">
+            💰 €${listing.price?.toLocaleString("en-US") || "—"} / месяц
+            ${listing.area_sqm ? `<br>📐 ${listing.area_sqm} м²` : ""}
+            ${listing.num_rooms ? `<br>🏠 ${listing.num_rooms} комн.` : ""}
+            <br>📍 ${listing.address_text}
+          </div>
+          <a href="${listing.url}" target="_blank" rel="noopener noreferrer" style="color: #2563EB; text-decoration: none; font-size: 12px; display: block; margin-top: 8px;">Посмотреть →</a>
+        </div>
+      `;
+
+      marker.bindPopup(popupContent);
+      markerClusterGroup.addLayer(marker);
+    });
+
+    map.addLayer(markerClusterGroup);
+
+    // Подгоняем вид на маркеры
+    if (listingsWithCoords.length > 0) {
+      const bounds = L.latLngBounds(
+        listingsWithCoords.map((l) => [l.latitude!, l.longitude!])
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    return () => {
+      map.removeLayer(markerClusterGroup);
+    };
+  }, [listingsWithCoords, center, zoom]);
 
   return (
     <div className={styles.mapContainer}>
@@ -117,101 +189,24 @@ const MapView: React.FC<MapViewProps> = ({
         <div className={styles.legendItem}>
           <div
             className={styles.legendMarker}
-            style={{ backgroundColor: '#e74c3c' }}
-          >
-            I
-          </div>
-          <span>Immobiliare.it</span>
+            style={{ backgroundColor: "#2563EB" }}
+          ></div>
+          <span>Объявления</span>
         </div>
         <div className={styles.legendItem}>
           <div
             className={styles.legendMarker}
-            style={{ backgroundColor: '#3498db' }}
-          >
-            Id
-          </div>
-          <span>Idealista.it</span>
+            style={{ backgroundColor: "#1e40af" }}
+          ></div>
+          <span>Группы объявлений</span>
         </div>
       </div>
 
-      <MapContainer
-        center={center}
-        zoom={zoom}
+      <div
+        ref={mapContainerRef}
         className={styles.map}
-        whenReady={() => setMapReady(true)}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {mapReady && <FitBounds listings={listingsWithCoords} />}
-
-        {listingsWithCoords.map((listing) => (
-          <Marker
-            key={listing.id}
-            position={[listing.latitude!, listing.longitude!]}
-            icon={getMarkerIcon(listing.source_site)}
-          >
-            <Popup className={styles.customPopup}>
-              <div className={styles.popupContent}>
-                <div className={styles.popupHeader}>
-                  <h3 className={styles.popupTitle}>
-                    {listing.title?.substring(0, 60)}
-                    {listing.title && listing.title.length > 60 ? '...' : ''}
-                  </h3>
-                  <span className={styles.sourceTag}>
-                    {listing.source_site}
-                  </span>
-                </div>
-
-                {listing.image_urls && listing.image_urls.length > 0 && (
-                  <img
-                    src={listing.image_urls[0]}
-                    alt={listing.title}
-                    className={styles.popupImage}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
-
-                <div className={styles.popupDetails}>
-                  <div className={styles.price}>
-                    💰 €{formatPrice(listing.price)} / месяц
-                  </div>
-
-                  <div className={styles.features}>
-                    {listing.area_sqm && (
-                      <span className={styles.feature}>
-                        📐 {listing.area_sqm} м²
-                      </span>
-                    )}
-                    {listing.rooms_count && (
-                      <span className={styles.feature}>
-                        🏠 {listing.rooms_count} комн.
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={styles.address}>
-                    📍 {listing.location_address}
-                  </div>
-                </div>
-
-                <a
-                  href={listing.url_details}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.viewButton}
-                >
-                  Посмотреть объявление →
-                </a>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+        style={{ width: "100%", height: "100%" }}
+      />
 
       {listingsWithCoords.length === 0 && (
         <div className={styles.noDataMessage}>

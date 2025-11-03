@@ -120,13 +120,6 @@ class ListingsService {
 
   // Конвертируем ответ API в формат Listing
   convertApiListingToListing(apiListing: any): Listing {
-    // Отладочная информация
-    console.log("Converting listing:", {
-      id: apiListing.id,
-      images: apiListing.images?.length || 0,
-      photos_urls: apiListing.photos_urls?.length || 0,
-    });
-
     return {
       id: apiListing.id,
       source_site: apiListing.source_site,
@@ -159,6 +152,7 @@ class ListingsService {
       // Для обратной совместимости с существующими компонентами
       address: apiListing.address_text,
       imageUrls: apiListing.images || apiListing.photos_urls || [],
+      images: apiListing.images || apiListing.photos_urls || [],
       source: apiListing.source_site,
       originalUrl: apiListing.url,
       type: apiListing.property_type,
@@ -184,7 +178,7 @@ class ListingsService {
 
       const response = await this.searchListings(searchParams);
 
-      const listings = response.listings.map((listing) =>
+      const listings = response.results.map((listing) =>
         this.convertApiListingToListing(listing)
       );
 
