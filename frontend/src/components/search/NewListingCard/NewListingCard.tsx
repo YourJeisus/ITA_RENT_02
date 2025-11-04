@@ -117,6 +117,10 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
         return;
       }
 
+      // CRITICAL: Остановка распространения события
+      e.stopPropagation();
+      (e as any).preventDefault?.();
+
       swipeStartRef.current = e.clientX;
       isDraggingRef.current = true;
       setIsDragging(true);
@@ -448,22 +452,25 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   return (
     <div
       className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] w-full overflow-hidden relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+      onClick={openListing}
       onKeyDown={handleCardKeyDown}
       onMouseEnter={handleMouseEnter}
       role="link"
       tabIndex={listingUrl ? 0 : -1}
-      onMouseDown={(e) => {
-        console.log("[Card Main] onMouseDown triggered on main div!");
-        e.stopPropagation();
-      }}
     >
       {/* Image container with slider */}
       <div
         className="relative h-[200px] w-full cursor-pointer select-none"
         onPointerLeave={handlePointerLeave}
+        onMouseEnter={handleMouseEnter}
+        onClick={(e) => {
+          console.log("[NewListingCard] Image container onClick", {
+            clientX: e.clientX,
+            target: e.currentTarget.className,
+          });
+        }}
         ref={imageBoxRef}
         style={{ userSelect: "none", touchAction: "none" }}
-        onClick={openListing}
       >
         <img
           src={currentImage}
