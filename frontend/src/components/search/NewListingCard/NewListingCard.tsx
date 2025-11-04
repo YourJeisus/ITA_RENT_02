@@ -29,6 +29,7 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   const swipeStartRef = useRef<number | null>(null);
   const changeImageRef = useRef<(direction: "next" | "prev") => void>(() => {});
   const isDraggingRef = useRef<boolean>(false);
+  const wasSwipeRef = useRef<boolean>(false);
   const isBrowser = typeof window !== "undefined";
 
   // DEBUG логирование
@@ -127,11 +128,16 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       const minSwipeDistance = 30;
 
       if (Math.abs(difference) >= minSwipeDistance) {
+        wasSwipeRef.current = true;
         if (difference > 0) {
           changeImageRef.current("next");
         } else {
           changeImageRef.current("prev");
         }
+        // Сбросить флаг после небольшой задержки
+        setTimeout(() => {
+          wasSwipeRef.current = false;
+        }, 100);
       }
 
       swipeStartRef.current = null;
@@ -164,6 +170,11 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   };
 
   const openListing = () => {
+    // Не открываем, если это был свайп
+    if (wasSwipeRef.current) {
+      return;
+    }
+
     if (!listingUrl) {
       return;
     }
