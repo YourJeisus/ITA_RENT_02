@@ -183,8 +183,9 @@ class SubitoScraper:
                 base_url = img_item.get('cdnBaseUrl') or img_item.get('url')
                 if base_url:
                     # Для Subito нужно добавить параметры размера
-                    if 'sbito.it' in base_url:
-                        img_url = f"{base_url}?rule=width-300"
+                    # Используем card-mobile-large-1x-auto (работающий параметр)
+                    if 'sbito.it' in base_url and 'rule=' not in base_url:
+                        img_url = f"{base_url}?rule=card-mobile-large-1x-auto"
                     else:
                         img_url = base_url
                     
