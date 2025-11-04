@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import MapView from "../components/map/MapView";
 import { listingsService } from "../services/listingsService";
+import apiClient from "../services/apiClient";
 import styles from "./MapPage.module.scss";
 
 interface Listing {
@@ -46,23 +47,19 @@ const MapPage: React.FC = () => {
           { city, minPrice, maxPrice, propertyType, sourceSite }
         );
 
-        // Используем новый эндпоинт для карты
-        const response = await fetch(
-          `/api/v1/listings/map?${new URLSearchParams({
+        // Используем apiClient с правильным URL
+        const response = await apiClient.get("/listings/map", {
+          params: {
             ...(city && { city }),
-            ...(minPrice && { min_price: minPrice.toString() }),
-            ...(maxPrice && { max_price: maxPrice.toString() }),
+            ...(minPrice && { min_price: minPrice }),
+            ...(maxPrice && { max_price: maxPrice }),
             ...(propertyType && { property_type: propertyType }),
             ...(sourceSite && { source_site: sourceSite }),
-            limit: "500"
-          }).toString()}`
-        );
+            limit: 500
+          }
+        });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = response.data;
 
         if (data.success) {
           setListings(data.listings || []);
