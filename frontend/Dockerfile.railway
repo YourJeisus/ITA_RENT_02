@@ -1,4 +1,4 @@
-# Простой Dockerfile для Railway
+# Dockerfile для Railway - frontend
 FROM node:20-alpine
 
 WORKDIR /app
@@ -27,4 +27,4 @@ RUN npm prune --omit=dev
 EXPOSE 8080
 
 # Запуск production сервера
-CMD ["node", "server.js"] 
+CMD ["node", "server.js"]
