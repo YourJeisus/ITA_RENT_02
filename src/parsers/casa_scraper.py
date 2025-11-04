@@ -147,9 +147,10 @@ class CasaScraper:
                         # Уже полный URL
                         img_url = uri
                     else:
+                        # Casa.it требует размер в URL: /800x600/ или /360x265/
                         # Убираем начальный слеш из uri если он есть
                         uri = uri.lstrip('/')
-                        img_url = self.image_base_url + uri
+                        img_url = self.image_base_url + '800x600/' + uri
                     images.append(img_url)
             
             data['images'] = images
@@ -283,7 +284,7 @@ async def main():
     
     args = parser.parse_args()
     
-    scraper = CasaItParallelScraper(max_concurrent=args.concurrent)
+    scraper = CasaScraper(max_concurrent=args.concurrent)
     
     # Парсим
     listings = await scraper.scrape_parallel(num_pages=args.pages)
