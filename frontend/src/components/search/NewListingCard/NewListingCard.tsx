@@ -19,40 +19,113 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   onShowMap,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [swipeStart, setSwipeStart] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [isCopyToastVisible, setCopyToastVisible] = useState(false);
   const copyToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const imageBoxRef = useRef<HTMLDivElement>(null);
+  const lastSwipeTimeRef = useRef<number>(0);
   const isBrowser = typeof window !== "undefined";
 
   const listingUrl = listing.url || listing.originalUrl || "";
 
-  // ===== Обработка изображений =====
-  const getImages = (): string[] => {
+  // ===== Обработка изображений с очисткой от дубликатов =====
+  const getValidImages = (): string[] => {
     // Пробуем все возможные поля с изображениями
     const images = listing.images || listing.photos_urls || listing.imageUrls;
+    
+    // Фильтруем пустые значения и убираем дубликаты
+    const validImages = Array.from(
+      new Set(
+        (images as string[])?.filter(
+          (url) => url && typeof url === "string" && url.trim().length > 0
+        ) || []
+      )
+    );
 
-    if (images && Array.isArray(images) && images.length > 0) {
-      return images;
-    }
-
-    return ["/placeholder-property.jpg"];
+    return validImages.length > 0
+      ? validImages
+      : ["/placeholder-property.jpg"];
   };
 
-  const images = getImages();
+  const images = getValidImages();
   const currentImage = images[currentImageIndex];
 
-  // Обработка движения мыши для смены изображений
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const width = rect.width;
-    const imageIndex = Math.floor((x / width) * images.length);
-    setCurrentImageIndex(Math.min(imageIndex, images.length - 1));
+  // Переключение на следующее изображение с дебаунсом
+  const changeImage = (direction: "next" | "prev") => {
+    const now = Date.now();
+    // Ограничиваем частоту переключений до 200ms минимум
+    if (now - lastSwipeTimeRef.current < 200) return;
+    lastSwipeTimeRef.current = now;
+
+    setCurrentImageIndex((prev) => {
+      if (direction === "next") {
+        return prev < images.length - 1 ? prev + 1 : 0;
+      } else {
+        return prev > 0 ? prev - 1 : images.length - 1;
+      }
+    });
   };
 
+  // Начало свайпа
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (images.length <= 1) return;
+    setSwipeStart(e.clientX);
+    setIsDragging(true);
+  };
+
+  // Конец свайпа - обработка на уровне документа
+  useEffect(() => {
+    if (!isDragging || swipeStart === null) return;
+
+    const handleMouseUp = (e: MouseEvent) => {
+      const swipeEnd = e.clientX;
+      const difference = swipeStart - swipeEnd;
+      const minSwipeDistance = 30; // Минимальное расстояние для свайпа
+
+      if (Math.abs(difference) > minSwipeDistance) {
+        if (difference > 0) {
+          // Свайп влево → следующее изображение
+          changeImage("next");
+        } else {
+          // Свайп вправо → предыдущее изображение
+          changeImage("prev");
+        }
+      }
+
+      // Очищаем состояние
+      setSwipeStart(null);
+      setIsDragging(false);
+    };
+
+    // Добавляем слушатель на document для корректной работы
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, swipeStart, images.length]);
+
+  // Предзагрузка следующего изображения для ускорения переключения
+  useEffect(() => {
+    if (images.length <= 1) return;
+    
+    const nextIndex =
+      currentImageIndex < images.length - 1 ? currentImageIndex + 1 : 0;
+    const nextImageUrl = images[nextIndex];
+    
+    if (nextImageUrl) {
+      const img = new Image();
+      img.src = nextImageUrl;
+    }
+  }, [currentImageIndex, images]);
+
+  // Отмена свайпа при выходе из области
   const handleMouseLeave = () => {
-    setCurrentImageIndex(0);
+    setSwipeStart(null);
+    setIsDragging(false);
   };
 
   const openListing = () => {
@@ -306,8 +379,9 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       {/* Image container with slider */}
       <div
         className="relative h-[200px] w-full cursor-pointer"
-        onMouseMove={handleMouseMove}
+        onMouseDown={handleMouseDown}
         onMouseLeave={handleMouseLeave}
+        ref={imageBoxRef}
       >
         <img
           src={currentImage}

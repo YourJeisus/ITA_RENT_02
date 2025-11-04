@@ -1,7 +1,7 @@
 """
 API endpoints для работы с объявлениями
 """
-from typing import List, Optional
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -9,8 +9,42 @@ from src.api.deps import get_db
 from src.crud.crud_listing import listing
 from src.schemas.listing import ListingResponse, ListingSearch
 from src.services.scraping_service import ScrapingService
+from src.services.telegram_bot import telegram_bot
+import logging
 
 router = APIRouter()
+
+
+# Добавляем функцию очистки изображений
+def _clean_images(images: Optional[List[str]]) -> List[str]:
+    """
+    Очищает список изображений от пустых значений и дубликатов
+    
+    Args:
+        images: Список URL изображений
+        
+    Returns:
+        Очищенный список уникальных валидных URL
+    """
+    if not images:
+        return []
+    
+    # Фильтруем пустые значения и приводим к нижнему регистру для сравнения
+    valid_images = []
+    seen = set()
+    
+    for img_url in images:
+        if img_url and isinstance(img_url, str):
+            cleaned_url = img_url.strip()
+            # Проверяем валидность URL
+            if cleaned_url and (cleaned_url.startswith('http://') or cleaned_url.startswith('https://')):
+                # Нормализуем для дедупликации (игнорируем параметры запроса)
+                base_url = cleaned_url.split('?')[0].split('#')[0].lower()
+                if base_url not in seen:
+                    seen.add(base_url)
+                    valid_images.append(cleaned_url)
+    
+    return valid_images
 
 
 @router.get("/", response_model=dict)
@@ -153,7 +187,7 @@ async def search_listings(
                     "is_furnished": l.furnished,
                     "pets_allowed": l.pets_allowed,
                     "features": l.features if hasattr(l, 'features') else [],
-                    "images": l.images if l.images else [],
+                    "images": _clean_images(l.images),
                     "virtual_tour_url": l.virtual_tour_url,
                     "agency_name": l.agency_name if hasattr(l, 'agency_name') else None,
                     "is_active": l.is_active,
