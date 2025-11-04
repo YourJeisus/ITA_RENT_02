@@ -97,6 +97,31 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   // Начало свайпа
   // Setup document listeners for pointer events
   useEffect(() => {
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      // Проверяем, что клик был именно внутри нашего контейнера
+      if (!imageBoxRef.current) return;
+      
+      const target = e.target as HTMLElement;
+      const isClickInside = imageBoxRef.current.contains(target);
+      
+      if (!isClickInside) return;
+      
+      console.log("[NewListingCard] GLOBAL handleMouseDown triggered!", {
+        clientX: e.clientX,
+        targetTagName: target?.tagName,
+        isInside: isClickInside,
+      });
+      
+      if (images.length <= 1) {
+        console.log("[NewListingCard] Skipping - only 1 image");
+        return;
+      }
+
+      swipeStartRef.current = e.clientX;
+      isDraggingRef.current = true;
+      setIsDragging(true);
+    };
+
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDraggingRef.current) return;
       console.log("[NewListingCard] handlePointerMove:", {
@@ -148,35 +173,13 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       setIsDragging(false);
     };
 
-    // Добавляем обработчик mousedown на элемент
-    const handleMouseDown = (e: MouseEvent) => {
-      console.log("[NewListingCard] NATIVE handleMouseDown triggered!", {
-        clientX: e.clientX,
-        target: (e.target as HTMLElement)?.tagName,
-      });
-      
-      if (images.length <= 1) {
-        console.log("[NewListingCard] Skipping - only 1 image");
-        return;
-      }
-
-      swipeStartRef.current = e.clientX;
-      isDraggingRef.current = true;
-      setIsDragging(true);
-    };
-
-    if (imageBoxRef.current) {
-      imageBoxRef.current.addEventListener("mousedown", handleMouseDown);
-    }
-
-    // Используем window для поддержки событий вне элемента
+    // Слушаем на document для максимально надежного захвата
+    document.addEventListener("mousedown", handleGlobalMouseDown, true);
     window.addEventListener("pointermove", handlePointerMove, true);
     window.addEventListener("pointerup", handlePointerUp, true);
 
     return () => {
-      if (imageBoxRef.current) {
-        imageBoxRef.current.removeEventListener("mousedown", handleMouseDown);
-      }
+      document.removeEventListener("mousedown", handleGlobalMouseDown, true);
       window.removeEventListener("pointermove", handlePointerMove, true);
       window.removeEventListener("pointerup", handlePointerUp, true);
     };
