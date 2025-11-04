@@ -126,7 +126,18 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
       const difference = swipeStart - swipeEnd;
       const minSwipeDistance = 30;
+      const clickThreshold = 10;
 
+      // Если разница < 10px - это обычный клик, открываем ссылку
+      if (Math.abs(difference) < clickThreshold) {
+        wasSwipeRef.current = false;
+        swipeStartRef.current = null;
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        return;
+      }
+
+      // Если разница >= 30px - это свайп
       if (Math.abs(difference) >= minSwipeDistance) {
         wasSwipeRef.current = true;
         if (difference > 0) {
@@ -170,11 +181,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   };
 
   const openListing = () => {
-    // Не открываем, если это был свайп
-    if (wasSwipeRef.current) {
-      return;
-    }
-
     if (!listingUrl) {
       return;
     }
