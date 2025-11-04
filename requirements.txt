@@ -40,9 +40,3 @@ python-dotenv==1.0.0
 
 # Линтинг и разработка
 flake8==6.1.0
-
-# MCP Server для ScraperAPI
-scraperapi-mcp-server==0.2.0
-
-# CORS (уже включен в FastAPI)
-# python-cors не нужен, используем встроенный CORSMiddleware twilio
