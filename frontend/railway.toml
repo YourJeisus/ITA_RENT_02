@@ -9,4 +9,4 @@ restartPolicyMaxRetries = 10
 [env]
 PORT = "8080"
 NODE_ENV = "production"
-VITE_API_URL = "https://itarent02back-production.up.railway.app" 
+VITE_API_URL = "https://itarent02back-production.up.railway.app/api/v1" 
