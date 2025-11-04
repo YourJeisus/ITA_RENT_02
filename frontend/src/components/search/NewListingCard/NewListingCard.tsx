@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Listing } from "../../../types";
 import heartIcon from "../../../designSvg/heart.svg";
@@ -19,7 +19,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   onShowMap,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [swipeStart, setSwipeStart] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isCopyToastVisible, setCopyToastVisible] = useState(false);
   const copyToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -27,7 +26,20 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   );
   const imageBoxRef = useRef<HTMLDivElement>(null);
   const lastSwipeTimeRef = useRef<number>(0);
+  const swipeStartRef = useRef<number | null>(null);
+  const changeImageRef = useRef<(direction: "next" | "prev") => void>(() => {});
+  const isDraggingRef = useRef<boolean>(false);
   const isBrowser = typeof window !== "undefined";
+
+  // DEBUG логирование
+  useEffect(() => {
+    console.log("[NewListingCard] RENDER:", {
+      listingId: listing.id,
+      hasImages: !!listing.images,
+      imageCount: listing.images?.length || 0,
+      listing_photos_urls: listing.photos_urls?.length,
+    });
+  }, [listing.id, listing.images, listing.photos_urls]);
 
   const listingUrl = listing.url || listing.originalUrl || "";
 
@@ -35,7 +47,7 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   const getValidImages = (): string[] => {
     // Пробуем все возможные поля с изображениями
     const images = listing.images || listing.photos_urls || listing.imageUrls;
-    
+
     // Фильтруем пустые значения и убираем дубликаты
     const validImages = Array.from(
       new Set(
@@ -45,87 +57,149 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       )
     );
 
-    return validImages.length > 0
-      ? validImages
-      : ["/placeholder-property.jpg"];
+    console.log("[getValidImages]", {
+      listing_images: listing.images?.length,
+      photos_urls: listing.photos_urls?.length,
+      imageUrls: listing.imageUrls?.length,
+      validImagesCount: validImages.length,
+    });
+
+    return validImages.length > 0 ? validImages : ["/placeholder-property.jpg"];
   };
 
   const images = getValidImages();
   const currentImage = images[currentImageIndex];
 
   // Переключение на следующее изображение с дебаунсом
-  const changeImage = (direction: "next" | "prev") => {
-    const now = Date.now();
-    // Ограничиваем частоту переключений до 200ms минимум
-    if (now - lastSwipeTimeRef.current < 200) return;
-    lastSwipeTimeRef.current = now;
+  const changeImage = useCallback(
+    (direction: "next" | "prev") => {
+      const now = Date.now();
+      // Ограничиваем частоту переключений до 200ms минимум
+      if (now - lastSwipeTimeRef.current < 200) return;
+      lastSwipeTimeRef.current = now;
 
-    setCurrentImageIndex((prev) => {
-      if (direction === "next") {
-        return prev < images.length - 1 ? prev + 1 : 0;
-      } else {
-        return prev > 0 ? prev - 1 : images.length - 1;
-      }
-    });
-  };
+      setCurrentImageIndex((prev) => {
+        if (direction === "next") {
+          return prev < images.length - 1 ? prev + 1 : 0;
+        } else {
+          return prev > 0 ? prev - 1 : images.length - 1;
+        }
+      });
+    },
+    [images.length]
+  );
+
+  // Сохраняем функцию в ref, чтобы она была доступна в обработчике без переподписки
+  useEffect(() => {
+    changeImageRef.current = changeImage;
+  }, [changeImage]);
 
   // Начало свайпа
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (images.length <= 1) return;
-    setSwipeStart(e.clientX);
-    setIsDragging(true);
-  };
-
-  // Конец свайпа - обработка на уровне документа
+  // Setup document listeners for pointer events
   useEffect(() => {
-    if (!isDragging || swipeStart === null) return;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      console.log("[NewListingCard] handlePointerMove:", {
+        clientX: e.clientX,
+      });
+    };
 
-    const handleMouseUp = (e: MouseEvent) => {
+    const handlePointerUp = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+
+      console.log("[NewListingCard] handlePointerUp:", {
+        clientX: e.clientX,
+        swipeStart: swipeStartRef.current,
+      });
+
       const swipeEnd = e.clientX;
-      const difference = swipeStart - swipeEnd;
-      const minSwipeDistance = 30; // Минимальное расстояние для свайпа
+      const swipeStart = swipeStartRef.current;
 
-      if (Math.abs(difference) > minSwipeDistance) {
-        if (difference > 0) {
-          // Свайп влево → следующее изображение
-          changeImage("next");
-        } else {
-          // Свайп вправо → предыдущее изображение
-          changeImage("prev");
-        }
+      if (swipeStart === null) {
+        console.log("[NewListingCard] swipeStart is null, aborting");
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        return;
       }
 
-      // Очищаем состояние
-      setSwipeStart(null);
+      const difference = swipeStart - swipeEnd;
+      const minSwipeDistance = 30;
+
+      console.log("[NewListingCard] Swipe calculation:", {
+        difference,
+        minSwipeDistance,
+        absDiff: Math.abs(difference),
+      });
+
+      if (Math.abs(difference) >= minSwipeDistance) {
+        if (difference > 0) {
+          console.log("[NewListingCard] Calling changeImageRef for NEXT");
+          changeImageRef.current("next");
+        } else {
+          console.log("[NewListingCard] Calling changeImageRef for PREV");
+          changeImageRef.current("prev");
+        }
+      } else {
+        console.log("[NewListingCard] Swipe distance too small, skipping");
+      }
+
+      swipeStartRef.current = null;
+      isDraggingRef.current = false;
       setIsDragging(false);
     };
 
-    // Добавляем слушатель на document для корректной работы
-    document.addEventListener("mouseup", handleMouseUp);
+    // Добавляем обработчик mousedown на элемент
+    const handleMouseDown = (e: MouseEvent) => {
+      console.log("[NewListingCard] NATIVE handleMouseDown triggered!", {
+        clientX: e.clientX,
+        target: (e.target as HTMLElement)?.tagName,
+      });
+      
+      if (images.length <= 1) {
+        console.log("[NewListingCard] Skipping - only 1 image");
+        return;
+      }
+
+      swipeStartRef.current = e.clientX;
+      isDraggingRef.current = true;
+      setIsDragging(true);
+    };
+
+    if (imageBoxRef.current) {
+      imageBoxRef.current.addEventListener("mousedown", handleMouseDown);
+    }
+
+    // Используем window для поддержки событий вне элемента
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerUp, true);
 
     return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
+      if (imageBoxRef.current) {
+        imageBoxRef.current.removeEventListener("mousedown", handleMouseDown);
+      }
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerup", handlePointerUp, true);
     };
-  }, [isDragging, swipeStart, images.length]);
+  }, [images.length]);
 
-  // Предзагрузка следующего изображения для ускорения переключения
-  useEffect(() => {
-    if (images.length <= 1) return;
-    
-    const nextIndex =
-      currentImageIndex < images.length - 1 ? currentImageIndex + 1 : 0;
-    const nextImageUrl = images[nextIndex];
-    
-    if (nextImageUrl) {
-      const img = new Image();
-      img.src = nextImageUrl;
-    }
-  }, [currentImageIndex, images]);
+  // Отмена свайпа при выходе из области (только если было начало)
+  const handlePointerLeave = () => {
+    // Не сбрасываем при mouseLeave - лучше дождаться pointerUp
+    console.log("[NewListingCard] handlePointerLeave:", {
+      isDragging: isDraggingRef.current,
+      swipeStart: swipeStartRef.current,
+    });
+  };
 
-  // Отмена свайпа при выходе из области
-  const handleMouseLeave = () => {
-    setSwipeStart(null);
-    setIsDragging(false);
+  // Debug обработчик для проверки, получает ли элемент события
+  const handleMouseEnter = () => {
+    console.log("[NewListingCard] handleMouseEnter triggered");
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    console.log("[NewListingCard] handleImageClick triggered", {
+      clientX: e.clientX,
+    });
   };
 
   const openListing = () => {
@@ -373,20 +447,28 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] w-full overflow-hidden relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
       onClick={openListing}
       onKeyDown={handleCardKeyDown}
+      onMouseEnter={handleMouseEnter}
       role="link"
       tabIndex={listingUrl ? 0 : -1}
     >
       {/* Image container with slider */}
       <div
-        className="relative h-[200px] w-full cursor-pointer"
-        onMouseDown={handleMouseDown}
-        onMouseLeave={handleMouseLeave}
+        className="relative h-[200px] w-full cursor-pointer select-none"
+        onPointerLeave={handlePointerLeave}
+        onMouseEnter={handleMouseEnter}
+        onClick={(e) => {
+          console.log("[NewListingCard] Image container onClick", {
+            clientX: e.clientX,
+            target: e.currentTarget.className,
+          });
+        }}
         ref={imageBoxRef}
+        style={{ userSelect: "none", touchAction: "none" }}
       >
         <img
           src={currentImage}
           alt={title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover pointer-events-auto"
           onError={(e) => {
             // Fallback к локальному плейсхолдеру при ошибке
             e.currentTarget.src = "/placeholder-property.jpg";
@@ -394,6 +476,9 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
           onLoad={() => {
             // Изображение успешно загружено
           }}
+          style={{ userSelect: "none" }}
+          draggable={false}
+          onClick={handleImageClick}
         />
 
         {/* Image indicators (dots) */}
