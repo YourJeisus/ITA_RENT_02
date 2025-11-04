@@ -12,13 +12,13 @@ RUN npm ci --verbose
 # Копируем весь код
 COPY . .
 
-# Переменные окружения для сборки
+# Переменные окружения для сборки - явно передаём с /api/v1
 ENV VITE_API_URL=https://itarent02back-production.up.railway.app/api/v1
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Сборка приложения
-RUN npm run build
+# Сборка приложения с явным указанием переменной окружения
+RUN VITE_API_URL=https://itarent02back-production.up.railway.app/api/v1 npm run build
 
 # Очистка dev зависимостей после сборки
 RUN npm prune --omit=dev

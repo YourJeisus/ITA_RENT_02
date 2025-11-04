@@ -17,6 +17,12 @@ export default defineConfig({
       '@': resolvedAliasPath,
     },
   },
+  define: {
+    // Явно определяем переменные окружения для production
+    'import.meta.env.VITE_API_URL': JSON.stringify(
+      process.env.VITE_API_URL || 'https://itarent02back-production.up.railway.app/api/v1'
+    ),
+  },
   server: {
     port: 3000,
   },
