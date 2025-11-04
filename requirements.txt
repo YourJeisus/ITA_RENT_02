@@ -20,7 +20,7 @@ email-validator==2.2.0
 # HTTP клиент для парсинга и тестирования
 httpx==0.25.2
 aiohttp==3.9.1
-requests==2.31.0
+requests>=2.32.3
 beautifulsoup4==4.12.2
 
 # Telegram бот
