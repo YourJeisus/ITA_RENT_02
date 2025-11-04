@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Listing } from "../../../types";
 import heartIcon from "../../../designSvg/heart.svg";
@@ -19,32 +19,19 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   onShowMap,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
   const [isCopyToastVisible, setCopyToastVisible] = useState(false);
   const copyToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const imageBoxRef = useRef<HTMLDivElement>(null);
-  const lastSwipeTimeRef = useRef<number>(0);
-  const swipeStartRef = useRef<number | null>(null);
-  const changeImageRef = useRef<(direction: "next" | "prev") => void>(() => {});
-  const isDraggingRef = useRef<boolean>(false);
-  const wasSwipeRef = useRef<boolean>(false);
+  const lastIndexUpdateRef = useRef<number>(0);
   const isBrowser = typeof window !== "undefined";
-
-  // DEBUG логирование
-  useEffect(() => {
-    // Debug logging removed for production
-  }, [listing.id, listing.images, listing.photos_urls]);
 
   const listingUrl = listing.url || listing.originalUrl || "";
 
   // ===== Обработка изображений с очисткой от дубликатов =====
   const getValidImages = (): string[] => {
-    // Пробуем все возможные поля с изображениями
     const images = listing.images || listing.photos_urls || listing.imageUrls;
-
-    // Фильтруем пустые значения и убираем дубликаты
     const validImages = Array.from(
       new Set(
         (images as string[])?.filter(
@@ -52,139 +39,43 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
         ) || []
       )
     );
-
     return validImages.length > 0 ? validImages : ["/placeholder-property.jpg"];
   };
 
   const images = getValidImages();
   const currentImage = images[currentImageIndex];
 
-  // Переключение на следующее изображение с дебаунсом
-  const changeImage = useCallback(
-    (direction: "next" | "prev") => {
-      const now = Date.now();
-      // Ограничиваем частоту переключений до 200ms минимум
-      if (now - lastSwipeTimeRef.current < 200) return;
-      lastSwipeTimeRef.current = now;
+  // Обработчик движения мышки над фото - определяет индекс на основе позиции
+  const handleImageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imageBoxRef.current || images.length <= 1) return;
 
-      setCurrentImageIndex((prev) => {
-        if (direction === "next") {
-          return prev < images.length - 1 ? prev + 1 : 0;
-        } else {
-          return prev > 0 ? prev - 1 : images.length - 1;
-        }
-      });
-    },
-    [images.length]
-  );
+    const rect = imageBoxRef.current.getBoundingClientRect();
+    const containerWidth = rect.width;
+    const mouseX = e.clientX - rect.left;
 
-  // Сохраняем функцию в ref, чтобы она была доступна в обработчике без переподписки
-  useEffect(() => {
-    changeImageRef.current = changeImage;
-  }, [changeImage]);
+    // Позиция от 0 (слева) до 1 (справа)
+    const position = Math.max(0, Math.min(1, mouseX / containerWidth));
 
-  // Начало свайпа
-  // Setup document listeners for pointer events
-  useEffect(() => {
-    const handleGlobalMouseDown = (e: MouseEvent) => {
-      // Проверяем, что клик был именно внутри нашего контейнера
-      if (!imageBoxRef.current) return;
-      
-      const target = e.target as HTMLElement;
-      const isClickInside = imageBoxRef.current.contains(target);
-      
-      if (!isClickInside) return;
-      
-      if (images.length <= 1) {
-        return;
-      }
+    // Вычисляем целевой индекс на основе позиции
+    // При position = 0 (левый край) → индекс 0 (первое фото)
+    // При position = 1 (правый край) → индекс = last
+    const targetIndex = Math.round(position * (images.length - 1));
 
-      // CRITICAL: Остановка распространения события
-      e.stopPropagation();
-      (e as any).preventDefault?.();
-
-      swipeStartRef.current = e.clientX;
-      isDraggingRef.current = true;
-      setIsDragging(true);
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-
-      const swipeEnd = e.clientX;
-      const swipeStart = swipeStartRef.current;
-
-      if (swipeStart === null) {
-        isDraggingRef.current = false;
-        setIsDragging(false);
-        return;
-      }
-
-      const difference = swipeStart - swipeEnd;
-      const minSwipeDistance = 30;
-      const clickThreshold = 10;
-
-      // Если разница < 10px - это обычный клик, открываем ссылку
-      if (Math.abs(difference) < clickThreshold) {
-        wasSwipeRef.current = false;
-        swipeStartRef.current = null;
-        isDraggingRef.current = false;
-        setIsDragging(false);
-        return;
-      }
-
-      // Если разница >= 30px - это свайп
-      if (Math.abs(difference) >= minSwipeDistance) {
-        wasSwipeRef.current = true;
-        if (difference > 0) {
-          changeImageRef.current("next");
-        } else {
-          changeImageRef.current("prev");
-        }
-        // Сбросить флаг после небольшой задержки
-        setTimeout(() => {
-          wasSwipeRef.current = false;
-        }, 100);
-      }
-
-      swipeStartRef.current = null;
-      isDraggingRef.current = false;
-      setIsDragging(false);
-    };
-
-    // Слушаем на document для максимально надежного захвата
-    document.addEventListener("mousedown", handleGlobalMouseDown, true);
-    window.addEventListener("pointermove", handlePointerMove, true);
-    window.addEventListener("pointerup", handlePointerUp, true);
-
-    return () => {
-      document.removeEventListener("mousedown", handleGlobalMouseDown, true);
-      window.removeEventListener("pointermove", handlePointerMove, true);
-      window.removeEventListener("pointerup", handlePointerUp, true);
-    };
-  }, [images.length]);
-
-  // Отмена свайпа при выходе из области (только если было начало)
-  const handlePointerLeave = () => {
-    // Не сбрасываем при mouseLeave - лучше дождаться pointerUp
-  };
-
-  // Debug обработчик для проверки, получает ли элемент события
-  const handleMouseEnter = () => {
-  };
-
-  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    // Обновляем индекс с небольшим дебаунсом (минимум 50ms между обновлениями)
+    const now = Date.now();
+    if (
+      targetIndex !== currentImageIndex &&
+      now - lastIndexUpdateRef.current >= 50
+    ) {
+      setCurrentImageIndex(targetIndex);
+      lastIndexUpdateRef.current = now;
+    }
   };
 
   const openListing = () => {
     if (!listingUrl) {
       return;
     }
-
     window.open(listingUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -252,29 +143,25 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
     onShowMap?.(listing.id);
   };
 
-  // ===== Форматирование заголовка (комнаты, метраж, этаж) =====
+  // ===== Форматирование заголовка =====
   const getTitle = (): string => {
     const parts: string[] = [];
 
-    // Количество комнат
     if (listing.property_type === "studio" || listing.num_rooms === 0) {
       parts.push("Studio");
     } else if (listing.num_rooms) {
       parts.push(`${listing.num_rooms}-room apt.`);
     }
 
-    // Площадь
     const area = listing.area_sqm || listing.area;
     if (area) {
       parts.push(`${area} m²`);
     }
 
-    // Этаж (формат: "5/8 floor" если есть общее количество этажей)
     if (listing.floor) {
       const floorMatch = listing.floor.match(/\d+/);
       if (floorMatch) {
         const currentFloor = floorMatch[0];
-        // Если есть информация об общем количестве этажей
         if (listing.floor && typeof listing.floor === "string") {
           const totalFloorsMatch = listing.floor.match(/\/(\d+)/);
           if (totalFloorsMatch) {
@@ -293,7 +180,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
   // ===== Форматирование адреса =====
   const getAddress = (): string => {
-    // Используем address_text или составляем из частей
     if (listing.address_text) {
       return listing.address_text;
     }
@@ -316,12 +202,10 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
   // ===== Получение комиссии агента =====
   const getCommission = (): string | null => {
-    // Ищем информацию о комиссии в описании или features
     if (listing.commission) {
       return listing.commission;
     }
 
-    // Ищем в features
     if (listing.features) {
       const commissionFeature = listing.features.find(
         (f) =>
@@ -334,7 +218,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       }
     }
 
-    // Ищем в описании
     if (listing.description) {
       const commissionMatch = listing.description.match(
         /commission[:\s]+([^,.\n]+)/i
@@ -351,11 +234,9 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   const getTransportIcon = (
     distance: string
   ): { icon: JSX.Element; type: "walk" | "car" } => {
-    // Если в строке есть "min" - извлекаем число минут
     const timeMatch = distance.match(/(\d+)\s*min/i);
     if (timeMatch) {
       const minutes = parseInt(timeMatch[1]);
-      // До 15 минут - пешком, больше - на авто
       if (minutes <= 15) {
         return {
           type: "walk",
@@ -425,34 +306,28 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       className="bg-white rounded-[12px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)] w-full overflow-hidden relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
       onClick={openListing}
       onKeyDown={handleCardKeyDown}
-      onMouseEnter={handleMouseEnter}
       role="link"
       tabIndex={listingUrl ? 0 : -1}
     >
-      {/* Image container with slider */}
+      {/* Image container with hover-based scrolling */}
       <div
         className="relative h-[200px] w-full cursor-pointer select-none"
-        onPointerLeave={handlePointerLeave}
-        onMouseEnter={handleMouseEnter}
-        onClick={(e) => {
+        onMouseMove={handleImageMouseMove}
+        onMouseLeave={() => {
+          // Можно добавить логику, если нужна
         }}
         ref={imageBoxRef}
-        style={{ userSelect: "none", touchAction: "none" }}
+        style={{ userSelect: "none" }}
       >
         <img
           src={currentImage}
           alt={title}
           className="w-full h-full object-cover pointer-events-auto"
           onError={(e) => {
-            // Fallback к локальному плейсхолдеру при ошибке
             e.currentTarget.src = "/placeholder-property.jpg";
-          }}
-          onLoad={() => {
-            // Изображение успешно загружено
           }}
           style={{ userSelect: "none" }}
           draggable={false}
-          onClick={handleImageClick}
         />
 
         {/* Image indicators (dots) */}
@@ -516,7 +391,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
               );
             })
           ) : (
-            // Моковые данные для проверки верстки
             <div className="flex items-center gap-[8px]">
               <div className="flex items-center gap-[6px] flex-1">
                 <svg
