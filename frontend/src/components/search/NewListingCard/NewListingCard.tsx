@@ -33,12 +33,7 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
   // DEBUG логирование
   useEffect(() => {
-    console.log("[NewListingCard] RENDER:", {
-      listingId: listing.id,
-      hasImages: !!listing.images,
-      imageCount: listing.images?.length || 0,
-      listing_photos_urls: listing.photos_urls?.length,
-    });
+    // Debug logging removed for production
   }, [listing.id, listing.images, listing.photos_urls]);
 
   const listingUrl = listing.url || listing.originalUrl || "";
@@ -56,13 +51,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
         ) || []
       )
     );
-
-    console.log("[getValidImages]", {
-      listing_images: listing.images?.length,
-      photos_urls: listing.photos_urls?.length,
-      imageUrls: listing.imageUrls?.length,
-      validImagesCount: validImages.length,
-    });
 
     return validImages.length > 0 ? validImages : ["/placeholder-property.jpg"];
   };
@@ -106,14 +94,7 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       
       if (!isClickInside) return;
       
-      console.log("[NewListingCard] GLOBAL handleMouseDown triggered!", {
-        clientX: e.clientX,
-        targetTagName: target?.tagName,
-        isInside: isClickInside,
-      });
-      
       if (images.length <= 1) {
-        console.log("[NewListingCard] Skipping - only 1 image");
         return;
       }
 
@@ -128,24 +109,15 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
 
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDraggingRef.current) return;
-      console.log("[NewListingCard] handlePointerMove:", {
-        clientX: e.clientX,
-      });
     };
 
     const handlePointerUp = (e: PointerEvent) => {
       if (!isDraggingRef.current) return;
 
-      console.log("[NewListingCard] handlePointerUp:", {
-        clientX: e.clientX,
-        swipeStart: swipeStartRef.current,
-      });
-
       const swipeEnd = e.clientX;
       const swipeStart = swipeStartRef.current;
 
       if (swipeStart === null) {
-        console.log("[NewListingCard] swipeStart is null, aborting");
         isDraggingRef.current = false;
         setIsDragging(false);
         return;
@@ -154,22 +126,12 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
       const difference = swipeStart - swipeEnd;
       const minSwipeDistance = 30;
 
-      console.log("[NewListingCard] Swipe calculation:", {
-        difference,
-        minSwipeDistance,
-        absDiff: Math.abs(difference),
-      });
-
       if (Math.abs(difference) >= minSwipeDistance) {
         if (difference > 0) {
-          console.log("[NewListingCard] Calling changeImageRef for NEXT");
           changeImageRef.current("next");
         } else {
-          console.log("[NewListingCard] Calling changeImageRef for PREV");
           changeImageRef.current("prev");
         }
-      } else {
-        console.log("[NewListingCard] Swipe distance too small, skipping");
       }
 
       swipeStartRef.current = null;
@@ -192,21 +154,13 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
   // Отмена свайпа при выходе из области (только если было начало)
   const handlePointerLeave = () => {
     // Не сбрасываем при mouseLeave - лучше дождаться pointerUp
-    console.log("[NewListingCard] handlePointerLeave:", {
-      isDragging: isDraggingRef.current,
-      swipeStart: swipeStartRef.current,
-    });
   };
 
   // Debug обработчик для проверки, получает ли элемент события
   const handleMouseEnter = () => {
-    console.log("[NewListingCard] handleMouseEnter triggered");
   };
 
   const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    console.log("[NewListingCard] handleImageClick triggered", {
-      clientX: e.clientX,
-    });
   };
 
   const openListing = () => {
@@ -464,10 +418,6 @@ const NewListingCard: React.FC<NewListingCardProps> = ({
         onPointerLeave={handlePointerLeave}
         onMouseEnter={handleMouseEnter}
         onClick={(e) => {
-          console.log("[NewListingCard] Image container onClick", {
-            clientX: e.clientX,
-            target: e.currentTarget.className,
-          });
         }}
         ref={imageBoxRef}
         style={{ userSelect: "none", touchAction: "none" }}
