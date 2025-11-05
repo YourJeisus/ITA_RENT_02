@@ -7,6 +7,7 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from src.core.config import settings
+from src.parsers.description_analyzer import DescriptionAnalyzer
 import json
 import re
 from datetime import datetime
@@ -129,6 +130,35 @@ class ImmobiliareScraper:
                     'city': 'Roma',
                     'scraped_at': datetime.utcnow().isoformat()
                 }
+                
+                # Извлекаем состояние недвижимости из ga4Condition
+                renovation_type = None
+                building_type = None
+                ga4_condition = properties.get('ga4Condition', '').lower()
+                
+                if ga4_condition:
+                    if 'nuova costruzione' in ga4_condition or 'nuovo' in ga4_condition:
+                        building_type = 'new_construction'
+                        renovation_type = 'renovated'  # Новая постройка = отремонтированная
+                    elif 'ristrutturato' in ga4_condition or 'ottimo' in ga4_condition:
+                        renovation_type = 'renovated'
+                    elif 'buono' in ga4_condition or 'abitabile' in ga4_condition:
+                        renovation_type = 'partially_renovated'
+                    elif 'da ristrutturare' in ga4_condition:
+                        renovation_type = 'not_renovated'
+                
+                # Анализируем floor даже без описания
+                from src.parsers.description_analyzer import DescriptionAnalyzer
+                analysis = DescriptionAnalyzer.analyze('', floor=listing['floor'])
+                listing['floor_number'] = analysis.get('floor_number')
+                listing['is_first_floor'] = analysis.get('is_first_floor')
+                listing['is_top_floor'] = analysis.get('is_top_floor')
+                listing['total_floors'] = analysis.get('total_floors')
+                
+                # Используем данные из Immobiliare API если они есть
+                listing['renovation_type'] = renovation_type
+                listing['building_type'] = building_type
+                listing['agency_commission'] = None  # Immobiliare не предоставляет эти данные в списке
                 
                 listings.append(listing)
             
@@ -312,6 +342,26 @@ class ImmobiliareScraper:
                     else:
                         print(f"    ⚠️ Описание не найдено")
                     
+                    # Анализ описания для извлечения фильтров
+                    # Всегда вызываем анализатор, даже без описания (для этажей и других данных)
+                    analysis = DescriptionAnalyzer.analyze(description or '', floor=listing['floor'])
+                    
+                    # Используем данные из API если они уже есть, иначе из анализа описания
+                    listing['agency_commission'] = listing.get('agency_commission') or analysis.get('agency_commission')
+                    listing['renovation_type'] = listing.get('renovation_type') or analysis.get('renovation_type')
+                    listing['building_type'] = listing.get('building_type') or analysis.get('building_type')
+                    
+                    # Остальные поля всегда из анализа описания
+                    listing['pets_allowed'] = analysis.get('pets_allowed')
+                    listing['children_friendly'] = analysis.get('children_friendly')
+                    listing['year_built'] = analysis.get('year_built')
+                    listing['total_floors'] = analysis.get('total_floors')
+                    listing['floor_number'] = analysis.get('floor_number')
+                    listing['is_first_floor'] = analysis.get('is_first_floor')
+                    listing['is_top_floor'] = analysis.get('is_top_floor')
+                    listing['park_nearby'] = analysis.get('park_nearby')
+                    listing['noisy_roads_nearby'] = analysis.get('noisy_roads_nearby')
+                    
                     self.stats['details_success'] += 1
                 else:
                     print(f"    ❌ Не удалось получить страницу")
@@ -357,7 +407,7 @@ async def main():
     
     args = parser.parse_args()
     
-    scraper = ImmobiliareSimpleScraper()
+    scraper = ImmobiliareScraper()
     listings = await scraper.scrape_listings(num_pages=args.pages, max_details=args.details)
     
     if listings:

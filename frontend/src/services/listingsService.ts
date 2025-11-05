@@ -15,6 +15,20 @@ interface SearchParams {
   source_site?: string;
   sort_by?: string;
   is_available?: boolean;
+  // Новые фильтры
+  no_commission?: boolean;
+  renovation?: string[];
+  building_type?: string[];
+  year_built_min?: number;
+  year_built_max?: number;
+  floor_min?: number;
+  floor_max?: number;
+  floors_in_building_min?: number;
+  floors_in_building_max?: number;
+  park_nearby?: boolean;
+  no_noisy_roads?: boolean;
+  children_allowed?: boolean;
+  pets_allowed?: boolean;
 }
 
 interface SearchResponse {

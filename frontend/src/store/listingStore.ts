@@ -20,6 +20,7 @@ interface ListingState {
   checkDatabaseStats: () => Promise<void>;
   clearResults: () => void;
   setPage: (page: number) => void;
+  setTotalListings: (total: number) => void;
 }
 
 export const useListingStore = create<ListingState>((set, get) => ({
@@ -87,5 +88,9 @@ export const useListingStore = create<ListingState>((set, get) => ({
 
   setPage: (page: number) => {
     set({ currentPage: page });
+  },
+
+  setTotalListings: (total: number) => {
+    set({ totalListings: total });
   },
 }));

@@ -7,6 +7,7 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from src.core.config import settings
+from src.parsers.description_analyzer import DescriptionAnalyzer
 import json
 import re
 from datetime import datetime
@@ -68,6 +69,68 @@ class IdealistaScraper:
                     return '0'
                 return feat.strip()
         return None
+    
+    def extract_renovation_from_features(self, features: List[str]) -> tuple[Optional[str], Optional[str]]:
+        """
+        Извлекает тип ремонта и тип здания из features.
+        Возвращает (renovation_type, building_type)
+        """
+        renovation_type = None
+        building_type = None
+        
+        for feat in features:
+            feat_lower = feat.lower()
+            
+            # Состояние/ремонт
+            if 'nuova costruzione' in feat_lower or 'nuovo' in feat_lower:
+                building_type = 'new_construction'
+                renovation_type = 'renovated'
+            elif 'ottimo' in feat_lower:
+                renovation_type = 'renovated'
+            elif 'buono' in feat_lower and 'stato' in feat_lower:
+                renovation_type = 'partially_renovated'
+            elif 'da ristrutturare' in feat_lower:
+                renovation_type = 'not_renovated'
+        
+        return renovation_type, building_type
+    
+    def extract_floor_details_from_features(self, features: List[str]) -> dict:
+        """
+        Извлекает детальную информацию об этаже из features.
+        Возвращает словарь с floor_number, is_first_floor, is_top_floor
+        """
+        result = {
+            'floor_number': None,
+            'is_first_floor': None,
+            'is_top_floor': None
+        }
+        
+        for feat in features:
+            feat_lower = feat.lower()
+            
+            # Ultimo piano (последний этаж)
+            if 'ultimo' in feat_lower and 'piano' in feat_lower:
+                result['is_top_floor'] = True
+                # Пытаемся извлечь номер этажа
+                match = re.search(r'(\d+)[º°]?\s*piano', feat, re.IGNORECASE)
+                if match:
+                    result['floor_number'] = int(match.group(1))
+            
+            # Piano terra (первый этаж / партер)
+            elif 'piano terra' in feat_lower or feat_lower == 'terra':
+                result['floor_number'] = 0
+                result['is_first_floor'] = True
+            
+            # Конкретный этаж с номером
+            elif 'piano' in feat_lower:
+                match = re.search(r'(\d+)[º°]?\s*piano', feat, re.IGNORECASE)
+                if match:
+                    floor_num = int(match.group(1))
+                    result['floor_number'] = floor_num
+                    if floor_num == 0 or floor_num == 1:
+                        result['is_first_floor'] = True
+        
+        return result
 
     async def fetch_html(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
         """Получает HTML через ScraperAPI с семафором для ограничения параллелизма"""
@@ -196,6 +259,10 @@ class IdealistaScraper:
             data['city'] = 'Roma'
             
             # Извлечение характеристик из features
+            renovation_type_from_features = None
+            building_type_from_features = None
+            floor_details_from_features = {}
+            
             if features:
                 area = self.extract_area_from_features(features)
                 if area:
@@ -212,6 +279,38 @@ class IdealistaScraper:
                 floor = self.extract_floor_from_features(features)
                 if floor:
                     data['floor'] = floor
+                
+                # Извлекаем тип ремонта и здания напрямую из features
+                renovation_type_from_features, building_type_from_features = self.extract_renovation_from_features(features)
+                
+                # Извлекаем детали этажа напрямую из features
+                floor_details_from_features = self.extract_floor_details_from_features(features)
+            
+            # Анализ описания для извлечения фильтров
+            if 'description' in data and data['description']:
+                # Передаем floor данные в анализатор для лучшего определения total_floors
+                analysis = DescriptionAnalyzer.analyze(
+                    data['description'],
+                    floor=data.get('floor')
+                )
+                
+                # Приоритизируем данные из Idealista features над DescriptionAnalyzer
+                data['renovation_type'] = renovation_type_from_features or analysis.get('renovation_type')
+                data['building_type'] = building_type_from_features or analysis.get('building_type')
+                
+                # Для этажей используем данные из features если они есть
+                data['floor_number'] = floor_details_from_features.get('floor_number') or analysis.get('floor_number')
+                data['is_first_floor'] = floor_details_from_features.get('is_first_floor') if floor_details_from_features.get('is_first_floor') is not None else analysis.get('is_first_floor')
+                data['is_top_floor'] = floor_details_from_features.get('is_top_floor') if floor_details_from_features.get('is_top_floor') is not None else analysis.get('is_top_floor')
+                
+                # Остальные поля из анализатора
+                data['agency_commission'] = analysis.get('agency_commission')
+                data['pets_allowed'] = analysis.get('pets_allowed')
+                data['children_friendly'] = analysis.get('children_friendly')
+                data['year_built'] = analysis.get('year_built')
+                data['total_floors'] = analysis.get('total_floors')
+                data['park_nearby'] = analysis.get('park_nearby')
+                data['noisy_roads_nearby'] = analysis.get('noisy_roads_nearby')
             
             return data
             
@@ -360,7 +459,7 @@ async def main():
     
     args = parser.parse_args()
     
-    scraper = IdealistaParallelScraper(max_concurrent=args.concurrent)
+    scraper = IdealistaScraper(max_concurrent=args.concurrent)
     
     # Парсим
     listings = await scraper.scrape_parallel(num_pages=args.pages)

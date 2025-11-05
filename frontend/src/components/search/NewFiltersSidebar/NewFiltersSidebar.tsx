@@ -11,8 +11,6 @@ type Filters = {
   city: string;
   min_area: string;
   max_area: string;
-  kitchen_area_min: string;
-  kitchen_area_max: string;
   no_commission: boolean;
   renovation: string[];
   floor_type: string[];
@@ -41,8 +39,6 @@ const NewFiltersSidebar: React.FC = () => {
     city: searchParams.get("city") || "Rome",
     min_area: searchParams.get("min_area") || "",
     max_area: searchParams.get("max_area") || "",
-    kitchen_area_min: searchParams.get("kitchen_area_min") || "",
-    kitchen_area_max: searchParams.get("kitchen_area_max") || "",
     no_commission: searchParams.get("no_commission") === "true",
     renovation: searchParams.getAll("renovation") || [],
     floor_type: searchParams.getAll("floor_type") || [],
@@ -64,8 +60,8 @@ const NewFiltersSidebar: React.FC = () => {
       | "property_type"
       | "rooms"
       | "renovation"
-      | "floor_type"
-      | "building_type",
+      | "floor_type",
+      // | "building_type", // СКРЫТО
     value: string
   ) => {
     setFilters((prev) => {
@@ -99,18 +95,14 @@ const NewFiltersSidebar: React.FC = () => {
     filters.rooms.forEach((room) => newParams.append("rooms", room));
     filters.renovation.forEach((type) => newParams.append("renovation", type));
     filters.floor_type.forEach((type) => newParams.append("floor_type", type));
-    filters.building_type.forEach((type) =>
-      newParams.append("building_type", type)
-    );
+    // filters.building_type.forEach((type) =>
+    //   newParams.append("building_type", type)
+    // ); // СКРЫТО
 
     if (filters.price_min) newParams.set("price_min", filters.price_min);
     if (filters.price_max) newParams.set("price_max", filters.price_max);
     if (filters.min_area) newParams.set("min_area", filters.min_area);
     if (filters.max_area) newParams.set("max_area", filters.max_area);
-    if (filters.kitchen_area_min)
-      newParams.set("kitchen_area_min", filters.kitchen_area_min);
-    if (filters.kitchen_area_max)
-      newParams.set("kitchen_area_max", filters.kitchen_area_max);
     if (filters.floor_min) newParams.set("floor_min", filters.floor_min);
     if (filters.floor_max) newParams.set("floor_max", filters.floor_max);
     if (filters.floors_in_building_min)
@@ -152,10 +144,9 @@ const NewFiltersSidebar: React.FC = () => {
   ];
 
   const renovationTypes = [
-    { value: "outdated", label: "Outdated" },
-    { value: "budget", label: "Budget" },
-    { value: "euro", label: "Euro renovation" },
-    { value: "designer", label: "Designer" },
+    { value: "not_renovated", label: "Not renovated" },
+    { value: "partially_renovated", label: "Partially renovated" },
+    { value: "renovated", label: "Renovated" },
   ];
 
   const floorTypes = [
@@ -165,15 +156,13 @@ const NewFiltersSidebar: React.FC = () => {
     { value: "only_last", label: "Only last" },
   ];
 
-  const buildingTypes = [
-    { value: "monolithic", label: "Monolithic" },
-    { value: "brick_monolithic", label: "Brick-monolithic" },
-    { value: "brick", label: "Brick" },
-    { value: "stalinka", label: "Stalinka" },
-    { value: "block", label: "Block" },
-    { value: "panel", label: "Panel" },
-    { value: "wooden", label: "Wooden" },
-  ];
+  // buildingTypes - СКРЫТО
+  // const buildingTypes = [
+  //   { value: "historic", label: "Historic building" },
+  //   { value: "modern", label: "Modern building" },
+  //   { value: "new_construction", label: "New construction" },
+  //   { value: "renovated_building", label: "Renovated building" },
+  // ];
 
   return (
     <aside className={styles.sidebar}>
@@ -392,30 +381,6 @@ const NewFiltersSidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Kitchen Area */}
-        <div className={styles.filterGroup}>
-          <h3 className={styles.groupTitle}>Kitchen area, m²</h3>
-          <div className={styles.rangeInputs}>
-            <input
-              type="number"
-              name="kitchen_area_min"
-              placeholder="From"
-              value={filters.kitchen_area_min}
-              onChange={handleInputChange}
-              className={styles.input}
-            />
-            <span className={styles.separator}>—</span>
-            <input
-              type="number"
-              name="kitchen_area_max"
-              placeholder="To"
-              value={filters.kitchen_area_max}
-              onChange={handleInputChange}
-              className={styles.input}
-            />
-          </div>
-        </div>
-
         {/* Floor Type */}
         <div className={styles.filterGroup}>
           <h3 className={styles.groupTitle}>Floor</h3>
@@ -508,8 +473,8 @@ const NewFiltersSidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Building Type */}
-        <div className={styles.filterGroup}>
+        {/* Building Type - СКРЫТО */}
+        {/* <div className={styles.filterGroup}>
           <h3 className={styles.groupTitle}>Building type/material</h3>
           <div className={styles.checkboxGroup}>
             {buildingTypes.map((type) => (
@@ -526,20 +491,18 @@ const NewFiltersSidebar: React.FC = () => {
               </label>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* Children/Pets */}
         <div className={styles.filterGroup}>
           <h3 className={styles.groupTitle}>Children/Pets</h3>
           <p className={styles.filterNote}>
-            Children/Pets — I filter only those listings where the ban is
+            I filter only those listings where the ban is
             explicitly stated in the description text — it's unlikely you'll be
             able to negotiate with such landlords. But if the ban is only
             indicated in the listing parameters and there's nothing in the text,
             it's worth trying. In good apartments, pets and children are often
-            prohibited by default, without serious consideration. If you don't
-            want to communicate yourself, contact our concierge service — we do
-            this professionally.
+            prohibited by default, without serious consideration.
           </p>
           <label className={styles.checkboxLabel}>
             <input
@@ -548,7 +511,7 @@ const NewFiltersSidebar: React.FC = () => {
               onChange={() => handleCheckboxChange("children_allowed")}
               className={styles.checkbox}
             />
-            <span>Without explicit ban on children</span>
+            <span>No explicit ban on children in description</span>
           </label>
           <label className={styles.checkboxLabel}>
             <input
@@ -557,7 +520,7 @@ const NewFiltersSidebar: React.FC = () => {
               onChange={() => handleCheckboxChange("pets_allowed")}
               className={styles.checkbox}
             />
-            <span>Without explicit ban on pets</span>
+            <span>No explicit ban on pets in description</span>
           </label>
         </div>
       </div>

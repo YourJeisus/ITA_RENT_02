@@ -7,6 +7,7 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from src.core.config import settings
+from src.parsers.description_analyzer import DescriptionAnalyzer
 import json
 import re
 from datetime import datetime
@@ -18,7 +19,8 @@ class SubitoScraper:
     
     def __init__(self, enable_geocoding: bool = False, fetch_coords: bool = False):
         self.base_url = "https://www.subito.it"
-        self.search_url = "https://www.subito.it/annunci-lazio/affitto/immobili/roma/roma/"
+        # URL с фильтрами: advt=0 (только частные), bc указывает состояние недвижимости
+        self.search_url = "https://www.subito.it/annunci-lazio/affitto/immobili/roma/"
         self.api_url = "https://api.scraperapi.com/"
         self.api_key = settings.SCRAPERAPI_KEY
         self.enable_geocoding = enable_geocoding  # Для совместимости с интерфейсом
@@ -32,17 +34,20 @@ class SubitoScraper:
         }
     
     async def fetch_html(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
-        """Получает HTML через ScraperAPI (простой запрос)"""
+        """Получает HTML через ScraperAPI с рендерингом JavaScript для пагинации"""
         params = {
             'api_key': self.api_key,
-            'url': url
+            'url': url,
+            'render': 'true',  # ВАЖНО: Subito требует JS-рендеринга для пагинации
         }
         
         try:
-            timeout = aiohttp.ClientTimeout(total=90)
+            timeout = aiohttp.ClientTimeout(total=120)
             async with session.get(self.api_url, params=params, timeout=timeout) as response:
                 if response.status == 200:
                     return await response.text()
+                else:
+                    print(f"    ❌ HTTP {response.status}: {await response.text()}")
                 return None
         except Exception as e:
             print(f"    ❌ Ошибка: {e}")
@@ -158,6 +163,40 @@ class SubitoScraper:
             elif 'appartamenti' in cat_name:
                 property_type = 'apartment'
             
+            # Тип объявления (частное/агентство)
+            advertiser = item.get('advertiser', {})
+            advertiser_type = advertiser.get('type')
+            is_company = advertiser.get('company', False)
+            
+            agency_commission = None
+            if advertiser_type == 0 or (not is_company and advertiser_type is not None):
+                agency_commission = False  # Частное объявление - без комиссии
+            elif advertiser_type == 1 or is_company:
+                agency_commission = True  # Агентство - есть комиссия
+            
+            # Состояние недвижимости из features
+            renovation_type = None
+            building_type = None
+            
+            if '/buildingcondition' in features_dict:
+                bc_values = features_dict['/buildingcondition'].get('values', [])
+                if bc_values:
+                    bc_value_dict = bc_values[0]
+                    if isinstance(bc_value_dict, dict):
+                        bc_code = bc_value_dict.get('key', '')
+                        bc_label = bc_value_dict.get('value', '').lower()
+                        
+                        # Маппинг на наши типы ремонта
+                        if 'nuova costruzione' in bc_label or bc_code == '10':
+                            building_type = 'new_construction'
+                            renovation_type = 'renovated'  # Новая постройка = отремонтированная
+                        elif 'ottimo' in bc_label or 'ristrutturato' in bc_label or bc_code == '20':
+                            renovation_type = 'renovated'
+                        elif 'buono' in bc_label or 'abitabile' in bc_label or bc_code == '30':
+                            renovation_type = 'partially_renovated'
+                        elif 'da ristrutturare' in bc_label or bc_code == '40':
+                            renovation_type = 'not_renovated'
+            
             # Геолокация
             geo = item.get('geo', {})
             map_data = geo.get('map', {})
@@ -198,7 +237,7 @@ class SubitoScraper:
             # Дата публикации
             published_at = item.get('date')
             
-            return {
+            listing_data = {
                 'external_id': f"subito_{external_id}",
                 'source': 'subito',
                 'url': url,
@@ -219,6 +258,42 @@ class SubitoScraper:
                 'published_at': published_at,
                 'scraped_at': datetime.utcnow().isoformat()
             }
+            
+            # Анализ описания для извлечения фильтров
+            if description:
+                analysis = DescriptionAnalyzer.analyze(description, floor=floor)
+                
+                # Используем данные из Subito API если они есть, иначе из анализа описания
+                listing_data['agency_commission'] = agency_commission if agency_commission is not None else analysis.get('agency_commission')
+                listing_data['renovation_type'] = renovation_type if renovation_type else analysis.get('renovation_type')
+                listing_data['building_type'] = building_type if building_type else analysis.get('building_type')
+                
+                # Остальные поля берем из анализа описания
+                listing_data['pets_allowed'] = analysis.get('pets_allowed')
+                listing_data['children_friendly'] = analysis.get('children_friendly')
+                listing_data['year_built'] = analysis.get('year_built')
+                listing_data['total_floors'] = analysis.get('total_floors')
+                listing_data['floor_number'] = analysis.get('floor_number')
+                listing_data['is_first_floor'] = analysis.get('is_first_floor')
+                listing_data['is_top_floor'] = analysis.get('is_top_floor')
+                listing_data['park_nearby'] = analysis.get('park_nearby')
+                listing_data['noisy_roads_nearby'] = analysis.get('noisy_roads_nearby')
+            else:
+                # Если нет описания, используем только данные из API
+                listing_data['agency_commission'] = agency_commission
+                listing_data['renovation_type'] = renovation_type
+                listing_data['building_type'] = building_type
+                listing_data['pets_allowed'] = None
+                listing_data['children_friendly'] = None
+                listing_data['year_built'] = None
+                listing_data['total_floors'] = None
+                listing_data['floor_number'] = None
+                listing_data['is_first_floor'] = None
+                listing_data['is_top_floor'] = None
+                listing_data['park_nearby'] = None
+                listing_data['noisy_roads_nearby'] = None
+            
+            return listing_data
             
         except Exception as e:
             print(f"    ❌ Ошибка парсинга объявления: {e}")
@@ -309,12 +384,27 @@ class SubitoScraper:
             
             # Парсинг всех страниц
             all_listings = []
+            seen_ids = set()  # Для дедупликации
+            
             for i, html in enumerate(htmls, 1):
                 if html:
                     print(f"Страница {i}: {len(html)} символов")
                     listings = self.parse_page(html)
                     print(f"    ✅ Найдено {len(listings)} объявлений")
-                    all_listings.extend(listings)
+                    
+                    # Дедупликация (временное решение для проблемы с пагинацией)
+                    unique_listings = []
+                    for listing in listings:
+                        external_id = listing.get('external_id')
+                        if external_id and external_id not in seen_ids:
+                            seen_ids.add(external_id)
+                            unique_listings.append(listing)
+                    
+                    if len(unique_listings) < len(listings):
+                        duplicates = len(listings) - len(unique_listings)
+                        print(f"    ⚠️  Пропущено {duplicates} дубликатов (проблема пагинации ScraperAPI)")
+                    
+                    all_listings.extend(unique_listings)
                     self.stats['success'] += 1
                 else:
                     print(f"Страница {i}: ❌ не загружена")
@@ -402,7 +492,7 @@ async def main():
     
     args = parser.parse_args()
     
-    scraper = SubitoParallelScraper()
+    scraper = SubitoScraper()
     listings = await scraper.scrape_pages(
         num_pages=args.pages,
         fetch_coords=args.coords,

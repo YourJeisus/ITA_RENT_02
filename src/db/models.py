@@ -188,10 +188,24 @@ class Listing(Base):
     floor: Mapped[Optional[str]] = mapped_column(Text)  # Убираем ограничение - может быть JSON
     total_floors: Mapped[Optional[int]] = mapped_column(Integer)
     
+    # Нормализованные поля этажей
+    floor_number: Mapped[Optional[int]] = mapped_column(Integer, index=True)  # Числовой этаж (0 = ground floor)
+    is_first_floor: Mapped[Optional[bool]] = mapped_column(Boolean)  # True если первый этаж (не ground)
+    is_top_floor: Mapped[Optional[bool]] = mapped_column(Boolean)  # True если последний этаж
+    
     # Дополнительные характеристики
     furnished: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)
     pets_allowed: Mapped[Optional[bool]] = mapped_column(Boolean)
     features: Mapped[Optional[List[str]]] = mapped_column(JSON)  # список особенностей
+    
+    # Новые фильтры (для восстановления нерабочих фильтров)
+    agency_commission: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)  # None/True = есть комиссия, False = нет
+    children_friendly: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)  # True = нет явного запрета, False = есть запрет
+    renovation_type: Mapped[Optional[str]] = mapped_column(String(50), index=True)  # not_renovated, partially_renovated, renovated
+    building_type: Mapped[Optional[str]] = mapped_column(String(50), index=True)  # historic, modern, new_construction, renovated_building
+    year_built: Mapped[Optional[int]] = mapped_column(Integer, index=True)  # год постройки
+    park_nearby: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)  # есть ли парк рядом
+    noisy_roads_nearby: Mapped[Optional[bool]] = mapped_column(Boolean, index=True)  # есть ли шумные дороги
     
     # Геолокация
     address: Mapped[Optional[str]] = mapped_column(Text)  # Убираем ограничение на адрес

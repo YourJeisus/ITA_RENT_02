@@ -11,6 +11,7 @@ import json
 import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from src.parsers.description_analyzer import DescriptionAnalyzer
 
 class CasaScraper:
     """Параллельный парсер Casa.it"""
@@ -74,6 +75,29 @@ class CasaScraper:
         except Exception as e:
             print(f"❌ Ошибка извлечения JSON: {e}")
             return None
+    
+    def extract_advertiser_type(self, listing_data: Dict[str, Any]) -> Optional[bool]:
+        """
+        Извлекает тип рекламодателя (частное лицо / агентство).
+        Возвращает: False = частное (без комиссии), True = агентство (с комиссией), None = неизвестно
+        """
+        advertiser = listing_data.get('advertiser', {})
+        
+        # Проверяем isPrivate
+        is_private = advertiser.get('isPrivate')
+        if is_private is True:
+            return False  # Частное лицо - без комиссии
+        elif is_private is False:
+            return True  # Агентство - с комиссией
+        
+        # Проверяем type
+        adv_type = advertiser.get('type', '').lower()
+        if adv_type == 'private' or adv_type == 'privati':
+            return False
+        elif adv_type == 'agency' or adv_type == 'agenzie':
+            return True
+        
+        return None
     
     def parse_listing(self, listing_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Парсит одно объявление из JSON"""
@@ -176,6 +200,29 @@ class CasaScraper:
                 features_list.append(f"Classe energetica {features['energyClass']}")
             
             data['features'] = features_list
+            
+            # Извлекаем тип рекламодателя напрямую из JSON
+            agency_commission_from_json = self.extract_advertiser_type(listing_data)
+            
+            # Анализ описания для извлечения фильтров
+            description = data.get('description', '')
+            analysis = DescriptionAnalyzer.analyze(description, floor=data.get('floor'))
+            
+            # Приоритизируем данные из Casa.it JSON над DescriptionAnalyzer
+            data['agency_commission'] = agency_commission_from_json if agency_commission_from_json is not None else analysis.get('agency_commission')
+            
+            # Остальные поля из анализатора
+            data['pets_allowed'] = analysis.get('pets_allowed')
+            data['children_friendly'] = analysis.get('children_friendly')
+            data['renovation_type'] = analysis.get('renovation_type')
+            data['building_type'] = analysis.get('building_type')
+            data['year_built'] = analysis.get('year_built')
+            data['total_floors'] = analysis.get('total_floors')
+            data['floor_number'] = analysis.get('floor_number')
+            data['is_first_floor'] = analysis.get('is_first_floor')
+            data['is_top_floor'] = analysis.get('is_top_floor')
+            data['park_nearby'] = analysis.get('park_nearby')
+            data['noisy_roads_nearby'] = analysis.get('noisy_roads_nearby')
             
             return data
             

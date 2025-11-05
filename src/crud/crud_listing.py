@@ -1,14 +1,60 @@
 """
 CRUD операции для объявлений
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func
+from sqlalchemy import and_, or_, desc, func, Index
 from datetime import datetime, timedelta
 
 from src.crud.base import CRUDBase
 from src.db.models import Listing
-from src.schemas.listing import ListingCreate, ListingUpdate
+from src.schemas.listing import ListingCreate, ListingUpdate, ListingResponse
+
+
+# Маппинг типов недвижимости между английским и итальянским
+PROPERTY_TYPE_MAPPING = {
+    "apartment": ["apartment", "appartamento"],
+    "studio": ["studio", "monolocale"],
+    "room": ["room", "stanza"],
+    "house": ["house", "casa"],
+    "penthouse": ["penthouse", "attico-mansarda", "attico"],
+}
+
+
+def normalize_property_type(property_types: Union[str, List[str]]) -> List[str]:
+    """
+    Нормализует типы недвижимости и возвращает все возможные варианты (английский и итальянский)
+    Принимает как одну строку, так и список строк
+    """
+    if not property_types:
+        return []
+    
+    # Если передана строка, преобразуем в список
+    if isinstance(property_types, str):
+        property_types = [property_types]
+    
+    result = []
+    for property_type in property_types:
+        property_type_lower = property_type.lower()
+        
+        # Проверяем прямое совпадение в маппинге
+        if property_type_lower in PROPERTY_TYPE_MAPPING:
+            result.extend(PROPERTY_TYPE_MAPPING[property_type_lower])
+        else:
+            # Проверяем в значениях маппинга
+            found = False
+            for key, values in PROPERTY_TYPE_MAPPING.items():
+                if property_type_lower in values:
+                    result.extend(values)
+                    found = True
+                    break
+            
+            # Если не найдено - добавляем исходное значение
+            if not found:
+                result.append(property_type_lower)
+    
+    # Возвращаем уникальные значения
+    return list(set(result))
 
 
 class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
@@ -49,7 +95,7 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         
         # Применяем фильтры
         if city:
-            query = query.filter(Listing.city.ilike(f"%{city}%"))
+            query = query.filter(func.lower(Listing.city).ilike(f"%{city.lower()}%"))
         
         if min_price is not None:
             query = query.filter(Listing.price >= min_price)
@@ -126,7 +172,7 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         )
         
         if city:
-            query = query.filter(Listing.city.ilike(f"%{city}%"))
+            query = query.filter(func.lower(Listing.city).ilike(f"%{city.lower()}%"))
         
         result = query.first()
         return {
@@ -236,7 +282,7 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         
         # Применяем фильтры
         if "city" in filters and filters["city"]:
-            query = query.filter(Listing.city.ilike(f"%{filters['city']}%"))
+            query = query.filter(func.lower(Listing.city).ilike(f"%{filters['city'].lower()}%"))
         
         if "min_price" in filters and filters["min_price"] is not None:
             query = query.filter(Listing.price >= filters["min_price"])
@@ -245,7 +291,8 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
             query = query.filter(Listing.price <= filters["max_price"])
         
         if "property_type" in filters and filters["property_type"]:
-            query = query.filter(Listing.property_type == filters["property_type"])
+            normalized_types = normalize_property_type(filters["property_type"])
+            query = query.filter(Listing.property_type.in_(normalized_types))
         
         if "min_rooms" in filters and filters["min_rooms"] is not None:
             query = query.filter(Listing.rooms >= filters["min_rooms"])
@@ -261,6 +308,94 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         
         if "source_site" in filters and filters["source_site"]:
             query = query.filter(Listing.source == filters["source_site"])
+        
+        # Новые фильтры
+        
+        # Agency commission - показываем ТОЛЬКО без комиссии (строго False)
+        if "no_commission" in filters and filters["no_commission"]:
+            query = query.filter(Listing.agency_commission == False)
+        
+        # Pets allowed - показываем где НЕТ явного запрета в описании
+        # Фильтр: показываем только где pets_allowed != False (то есть True или None)
+        if "pets_allowed" in filters and filters["pets_allowed"]:
+            query = query.filter(
+                or_(
+                    Listing.pets_allowed == True,
+                    Listing.pets_allowed == None
+                )
+            )
+        
+        # Children allowed - показываем где НЕТ явного запрета в описании
+        # Фильтр: показываем только где children_friendly != False (то есть True или None)
+        if "children_allowed" in filters and filters["children_allowed"]:
+            query = query.filter(
+                or_(
+                    Listing.children_friendly == True,
+                    Listing.children_friendly == None
+                )
+            )
+        
+        # Renovation types (массив)
+        if "renovation" in filters and filters["renovation"] and len(filters["renovation"]) > 0:
+            query = query.filter(Listing.renovation_type.in_(filters["renovation"]))
+        
+        # Building types (массив) - СКРЫТО
+        # if "building_type" in filters and filters["building_type"] and len(filters["building_type"]) > 0:
+        #     query = query.filter(Listing.building_type.in_(filters["building_type"]))
+        
+        # Year built range
+        if "year_built_min" in filters and filters["year_built_min"] is not None:
+            query = query.filter(Listing.year_built >= filters["year_built_min"])
+        if "year_built_max" in filters and filters["year_built_max"] is not None:
+            query = query.filter(Listing.year_built <= filters["year_built_max"])
+        
+        # Floor type filter (not_first, not_last, not_first_not_last, only_last)
+        if "floor_type" in filters and filters["floor_type"] and len(filters["floor_type"]) > 0:
+            floor_conditions = []
+            for ftype in filters["floor_type"]:
+                if ftype == "not_first":
+                    # Не первый этаж (floor_number != 1 или is_first_floor = False)
+                    floor_conditions.append(
+                        or_(
+                            Listing.floor_number != 1,
+                            Listing.is_first_floor == False
+                        )
+                    )
+                elif ftype == "not_last":
+                    # Не последний этаж (is_top_floor = False)
+                    floor_conditions.append(Listing.is_top_floor == False)
+                elif ftype == "not_first_not_last":
+                    # Не первый и не последний
+                    floor_conditions.append(
+                        and_(
+                            or_(Listing.floor_number != 1, Listing.is_first_floor == False),
+                            Listing.is_top_floor == False
+                        )
+                    )
+                elif ftype == "only_last":
+                    # Только последний этаж
+                    floor_conditions.append(Listing.is_top_floor == True)
+            
+            if floor_conditions:
+                query = query.filter(or_(*floor_conditions))
+        
+        # Floor range (используем нормализованное поле floor_number)
+        if "floor_min" in filters and filters["floor_min"] is not None:
+            query = query.filter(Listing.floor_number >= filters["floor_min"])
+        if "floor_max" in filters and filters["floor_max"] is not None:
+            query = query.filter(Listing.floor_number <= filters["floor_max"])
+        
+        # Floors in building range
+        if "floors_in_building_min" in filters and filters["floors_in_building_min"] is not None:
+            query = query.filter(Listing.total_floors >= filters["floors_in_building_min"])
+        if "floors_in_building_max" in filters and filters["floors_in_building_max"] is not None:
+            query = query.filter(Listing.total_floors <= filters["floors_in_building_max"])
+        
+        # Parks/Roads
+        if "park_nearby" in filters and filters["park_nearby"]:
+            query = query.filter(Listing.park_nearby == True)
+        if "no_noisy_roads" in filters and filters["no_noisy_roads"]:
+            query = query.filter(Listing.noisy_roads_nearby == False)
         
         # Сортировка по дате добавления (новые первыми)
         query = query.order_by(desc(Listing.scraped_at))
@@ -278,7 +413,7 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         
         # Применяем те же фильтры что и в search_with_filters
         if "city" in filters and filters["city"]:
-            query = query.filter(Listing.city.ilike(f"%{filters['city']}%"))
+            query = query.filter(func.lower(Listing.city).ilike(f"%{filters['city'].lower()}%"))
         
         if "min_price" in filters and filters["min_price"] is not None:
             query = query.filter(Listing.price >= filters["min_price"])
@@ -287,7 +422,8 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
             query = query.filter(Listing.price <= filters["max_price"])
         
         if "property_type" in filters and filters["property_type"]:
-            query = query.filter(Listing.property_type == filters["property_type"])
+            normalized_types = normalize_property_type(filters["property_type"])
+            query = query.filter(Listing.property_type.in_(normalized_types))
         
         if "min_rooms" in filters and filters["min_rooms"] is not None:
             query = query.filter(Listing.rooms >= filters["min_rooms"])
@@ -303,6 +439,88 @@ class CRUDListing(CRUDBase[Listing, ListingCreate, ListingUpdate]):
         
         if "source_site" in filters and filters["source_site"]:
             query = query.filter(Listing.source == filters["source_site"])
+        
+        # Новые фильтры (те же что и в search_with_filters)
+        
+        # Agency commission - показываем ТОЛЬКО без комиссии (строго False)
+        if "no_commission" in filters and filters["no_commission"]:
+            query = query.filter(Listing.agency_commission == False)
+        
+        # Pets allowed - показываем где НЕТ явного запрета в описании
+        if "pets_allowed" in filters and filters["pets_allowed"]:
+            query = query.filter(
+                or_(
+                    Listing.pets_allowed == True,
+                    Listing.pets_allowed == None
+                )
+            )
+        
+        # Children allowed - показываем где НЕТ явного запрета в описании
+        if "children_allowed" in filters and filters["children_allowed"]:
+            query = query.filter(
+                or_(
+                    Listing.children_friendly == True,
+                    Listing.children_friendly == None
+                )
+            )
+        
+        # Renovation types (массив)
+        if "renovation" in filters and filters["renovation"] and len(filters["renovation"]) > 0:
+            query = query.filter(Listing.renovation_type.in_(filters["renovation"]))
+        
+        # Building types (массив) - СКРЫТО
+        # if "building_type" in filters and filters["building_type"] and len(filters["building_type"]) > 0:
+        #     query = query.filter(Listing.building_type.in_(filters["building_type"]))
+        
+        # Year built range
+        if "year_built_min" in filters and filters["year_built_min"] is not None:
+            query = query.filter(Listing.year_built >= filters["year_built_min"])
+        if "year_built_max" in filters and filters["year_built_max"] is not None:
+            query = query.filter(Listing.year_built <= filters["year_built_max"])
+        
+        # Floor type filter (not_first, not_last, not_first_not_last, only_last)
+        if "floor_type" in filters and filters["floor_type"] and len(filters["floor_type"]) > 0:
+            floor_conditions = []
+            for ftype in filters["floor_type"]:
+                if ftype == "not_first":
+                    floor_conditions.append(
+                        or_(
+                            Listing.floor_number != 1,
+                            Listing.is_first_floor == False
+                        )
+                    )
+                elif ftype == "not_last":
+                    floor_conditions.append(Listing.is_top_floor == False)
+                elif ftype == "not_first_not_last":
+                    floor_conditions.append(
+                        and_(
+                            or_(Listing.floor_number != 1, Listing.is_first_floor == False),
+                            Listing.is_top_floor == False
+                        )
+                    )
+                elif ftype == "only_last":
+                    floor_conditions.append(Listing.is_top_floor == True)
+            
+            if floor_conditions:
+                query = query.filter(or_(*floor_conditions))
+        
+        # Floor range
+        if "floor_min" in filters and filters["floor_min"] is not None:
+            query = query.filter(Listing.floor_number >= filters["floor_min"])
+        if "floor_max" in filters and filters["floor_max"] is not None:
+            query = query.filter(Listing.floor_number <= filters["floor_max"])
+        
+        # Floors in building range
+        if "floors_in_building_min" in filters and filters["floors_in_building_min"] is not None:
+            query = query.filter(Listing.total_floors >= filters["floors_in_building_min"])
+        if "floors_in_building_max" in filters and filters["floors_in_building_max"] is not None:
+            query = query.filter(Listing.total_floors <= filters["floors_in_building_max"])
+        
+        # Parks/Roads
+        if "park_nearby" in filters and filters["park_nearby"]:
+            query = query.filter(Listing.park_nearby == True)
+        if "no_noisy_roads" in filters and filters["no_noisy_roads"]:
+            query = query.filter(Listing.noisy_roads_nearby == False)
         
         return query.count()
     

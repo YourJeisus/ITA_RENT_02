@@ -52,7 +52,7 @@ async def search_listings(
     city: Optional[str] = Query(None, description="Город для поиска"),
     min_price: Optional[float] = Query(None, description="Минимальная цена"),
     max_price: Optional[float] = Query(None, description="Максимальная цена"),
-    property_type: Optional[str] = Query(None, description="Тип недвижимости"),
+    property_type: Optional[List[str]] = Query(None, description="Тип недвижимости"),
     min_rooms: Optional[int] = Query(None, description="Минимальное количество комнат"),
     max_rooms: Optional[int] = Query(None, description="Максимальное количество комнат"),
     min_area: Optional[float] = Query(None, description="Минимальная площадь"),
@@ -62,12 +62,48 @@ async def search_listings(
     limit: int = Query(50, ge=1, le=100, description="Количество записей на странице"),
     force_scraping: bool = Query(False, description="Принудительно запустить парсинг"),
     max_pages: int = Query(5, ge=1, le=20, description="Максимальное количество страниц для парсинга"),
+    # Новые фильтры
+    no_commission: Optional[bool] = Query(None, description="Без комиссии агента"),
+    renovation: Optional[List[str]] = Query(None, description="Тип ремонта"),
+    # building_type: Optional[List[str]] = Query(None, description="Тип здания"),  # СКРЫТО
+    year_built_min: Optional[int] = Query(None, description="Минимальный год постройки"),
+    year_built_max: Optional[int] = Query(None, description="Максимальный год постройки"),
+    floor_type: Optional[List[str]] = Query(None, description="Тип этажа (not_first, not_last, not_first_not_last, only_last)"),
+    floor_min: Optional[int] = Query(None, description="Минимальный этаж"),
+    floor_max: Optional[int] = Query(None, description="Максимальный этаж"),
+    floors_in_building_min: Optional[int] = Query(None, description="Минимальное количество этажей в доме"),
+    floors_in_building_max: Optional[int] = Query(None, description="Максимальное количество этажей в доме"),
+    park_nearby: Optional[bool] = Query(None, description="Парк рядом"),
+    no_noisy_roads: Optional[bool] = Query(None, description="Без шумных дорог"),
+    children_allowed: Optional[bool] = Query(None, description="Разрешены дети"),
+    pets_allowed: Optional[bool] = Query(None, description="Разрешены животные"),
     db: Session = Depends(get_db)
 ):
     """
     Поиск объявлений с фильтрами и автоматическим парсингом
     """
     try:
+        # Нормализуем город (capitalize first letter для Roma, Milano, etc.)
+        # Маппинг распространенных вариантов названий городов
+        CITY_MAPPING = {
+            "rome": "Roma",
+            "roma": "Roma",
+            "milano": "Milano",
+            "milan": "Milano",
+            "florence": "Firenze",
+            "firenze": "Firenze",
+            "naples": "Napoli",
+            "napoli": "Napoli",
+            "turin": "Torino",
+            "torino": "Torino",
+            "venice": "Venezia",
+            "venezia": "Venezia",
+        }
+        
+        if city:
+            city_lower = city.lower()
+            city = CITY_MAPPING.get(city_lower, city.capitalize())
+        
         # Формируем фильтры
         filters = {
             "city": city,
@@ -78,7 +114,22 @@ async def search_listings(
             "max_rooms": max_rooms,
             "min_area": min_area,
             "max_area": max_area,
-            "source_site": source_site
+            "source_site": source_site,
+            # Новые фильтры
+            "no_commission": no_commission,
+            "renovation": renovation,
+            # "building_type": building_type,  # СКРЫТО
+            "year_built_min": year_built_min,
+            "year_built_max": year_built_max,
+            "floor_type": floor_type,
+            "floor_min": floor_min,
+            "floor_max": floor_max,
+            "floors_in_building_min": floors_in_building_min,
+            "floors_in_building_max": floors_in_building_max,
+            "park_nearby": park_nearby,
+            "no_noisy_roads": no_noisy_roads,
+            "children_allowed": children_allowed,
+            "pets_allowed": pets_allowed,
         }
         
         # Убираем None значения
@@ -184,8 +235,19 @@ async def search_listings(
                     "num_bathrooms": l.bathrooms,
                     "property_type": l.property_type,
                     "floor": l.floor,
+                    "floor_number": l.floor_number,
+                    "is_first_floor": l.is_first_floor,
+                    "is_top_floor": l.is_top_floor,
+                    "total_floors": l.total_floors,
                     "is_furnished": l.furnished,
                     "pets_allowed": l.pets_allowed,
+                    "children_friendly": l.children_friendly,
+                    "renovation_type": l.renovation_type,
+                    "building_type": l.building_type,
+                    "year_built": l.year_built,
+                    "agency_commission": l.agency_commission,
+                    "park_nearby": l.park_nearby,
+                    "noisy_roads_nearby": l.noisy_roads_nearby,
                     "features": l.features if hasattr(l, 'features') else [],
                     "images": _clean_images(l.images),
                     "virtual_tour_url": l.virtual_tour_url,

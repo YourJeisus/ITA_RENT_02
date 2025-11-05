@@ -68,6 +68,15 @@ export interface Listing {
   area?: number;
   commission?: string;
   renovationType?: string;
+  
+  // Новые поля для фильтров
+  agency_commission?: boolean;
+  children_friendly?: boolean;
+  renovation_type?: string;
+  building_type?: string;
+  year_built?: number;
+  park_nearby?: boolean;
+  noisy_roads_nearby?: boolean;
 }
 
 export interface ApiResponse<T> {

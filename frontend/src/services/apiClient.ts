@@ -37,6 +37,9 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
   },
   timeout: 15000, // Увеличиваем таймаут до 15 секунд
+  paramsSerializer: {
+    indexes: null, // Это важно! Убирает индексы из массивов в URL
+  },
 });
 
 // Перехватчик для добавления токена авторизации

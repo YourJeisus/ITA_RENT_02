@@ -19,6 +19,9 @@ class ListingBase(BaseModel):
     area: Optional[float] = None
     floor: Optional[str] = None
     total_floors: Optional[int] = None
+    floor_number: Optional[int] = None
+    is_first_floor: Optional[bool] = None
+    is_top_floor: Optional[bool] = None
     furnished: Optional[bool] = None
     pets_allowed: Optional[bool] = None
     features: Optional[List[str]] = None
@@ -37,6 +40,15 @@ class ListingBase(BaseModel):
     is_active: Optional[bool] = True
     published_at: Optional[datetime] = None
     scraped_at: Optional[datetime] = None
+
+    # Новые фильтры
+    agency_commission: Optional[bool] = None
+    children_friendly: Optional[bool] = None
+    renovation_type: Optional[str] = None
+    building_type: Optional[str] = None
+    year_built: Optional[int] = None
+    park_nearby: Optional[bool] = None
+    noisy_roads_nearby: Optional[bool] = None
 
 
 class ListingCreate(ListingBase):
